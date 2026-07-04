@@ -31,14 +31,17 @@ final class TenantRepository
             'Documentos analizados' => $this->count('documents', $companyId),
             'Cotizaciones' => $this->count('quotes', $companyId),
             'Integraciones' => $this->count('integrations', $companyId),
+            'Mensajes respondidos' => $this->tableExists('inbox_messages') ? $this->countWhere('inbox_messages', $companyId, "direction = 'out'") : 0,
+            'Tareas creadas' => $this->tableExists('crm_tasks') ? $this->countWhere('crm_tasks', $companyId, "status = 'pending'") : 0,
+            'Reuniones agendadas' => 0,
         ];
         $tokens = (int) $this->scalar('SELECT COALESCE(SUM(prompt_tokens + completion_tokens), 0) FROM ai_usage_logs WHERE company_id = :company_id', $companyId);
 
         return [
             ['label' => 'Correos revisados', 'value' => 0, 'trend' => 'Conector simulado'],
-            ['label' => 'Mensajes respondidos', 'value' => 0, 'trend' => 'Sandbox'],
-            ['label' => 'Reuniones agendadas', 'value' => 0, 'trend' => 'Calendar listo'],
-            ['label' => 'Tareas creadas', 'value' => 0, 'trend' => 'Automatizaciones'],
+            ['label' => 'Mensajes respondidos', 'value' => $counts['Mensajes respondidos'], 'trend' => 'Omnicanal'],
+            ['label' => 'Reuniones agendadas', 'value' => $counts['Reuniones agendadas'], 'trend' => 'Calendario'],
+            ['label' => 'Tareas creadas', 'value' => $counts['Tareas creadas'], 'trend' => 'Pendientes'],
             ['label' => 'Clientes contactados', 'value' => $counts['Clientes contactados'], 'trend' => 'CRM'],
             ['label' => 'Oportunidades detectadas', 'value' => $counts['Clientes contactados'], 'trend' => 'Pipeline'],
             ['label' => 'Documentos analizados', 'value' => $counts['Documentos analizados'], 'trend' => 'Memoria'],
@@ -328,9 +331,17 @@ final class TenantRepository
         $statement = Database::connection()->prepare('SELECT provider, status FROM integrations WHERE company_id = :company_id ORDER BY provider');
         $statement->execute(['company_id' => $companyId]);
 
-        return array_map(function (array $row) use ($labels): array {
+        $statuses = [
+            'simulated' => 'Pendiente',
+            'sandbox' => 'Prueba',
+            'connected' => 'Conectada',
+            'disabled' => 'Pausada',
+            'error' => 'Error',
+        ];
+
+        return array_map(function (array $row) use ($labels, $statuses): array {
             [$name, $scope] = $labels[$row['provider']] ?? [ucfirst($row['provider']), 'Conector externo'];
-            return ['name' => $name, 'status' => ucfirst($row['status']), 'scope' => $scope];
+            return ['name' => $name, 'status' => $statuses[$row['status']] ?? 'Pendiente', 'scope' => $scope];
         }, $statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
@@ -431,6 +442,21 @@ final class TenantRepository
         $statement = Database::connection()->prepare($sql);
         $statement->execute(['company_id' => $companyId]);
         return $statement->fetchColumn();
+    }
+
+    private function tableExists(string $table): bool
+    {
+        static $cache = [];
+        if (array_key_exists($table, $cache)) {
+            return $cache[$table];
+        }
+
+        try {
+            Database::connection()->query("SELECT 1 FROM {$table} LIMIT 1");
+            return $cache[$table] = true;
+        } catch (\Throwable) {
+            return $cache[$table] = false;
+        }
     }
 
     private function money(float $amount, string $currency): string

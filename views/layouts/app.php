@@ -6,20 +6,20 @@ $navigation = [
     'Inicio' => [
         ['/dashboard', 'Dashboard', 'bi-grid-1x2', null],
         ['/my-day', 'Mi dia', 'bi-calendar2-check', null],
-        ['/workbench', 'Bandeja de trabajo', 'bi-briefcase', '5'],
-        ['/notifications', 'Notificaciones', 'bi-bell', '8'],
+        ['/workbench', 'Bandeja de trabajo', 'bi-briefcase', null],
+        ['/notifications', 'Notificaciones', 'bi-bell', null],
     ],
     'Asistente' => [
         ['/chat', 'Chat IA', 'bi-stars', null],
-        ['/tasks', 'Tareas', 'bi-list-task', '4'],
+        ['/tasks', 'Tareas', 'bi-list-task', null],
         ['/automations', 'Automatizaciones', 'bi-magic', null],
-        ['/actions', 'Aprobaciones', 'bi-check2-square', '3'],
+        ['/actions', 'Aprobaciones', 'bi-check2-square', null],
         ['/controls', 'Controles', 'bi-sliders', null],
         ['/documents', 'Memoria', 'bi-database-check', null],
         ['/assistant', 'Reglas', 'bi-sliders2', null],
     ],
     'Comunicacion' => [
-        ['/inbox', 'Omnicanal', 'bi-inboxes', '8'],
+        ['/inbox', 'Omnicanal', 'bi-inboxes', null],
         ['/social', 'Asisti Social', 'bi-megaphone', null],
     ],
     'Comercial' => [
@@ -109,8 +109,8 @@ $navigation = [
                 <?php endforeach; ?>
             </nav>
             <div class="sidebar-footer">
-                <span>Demo LatAm</span>
-                <strong>Lista para pilotos</strong>
+                <span>Workspace real</span>
+                <strong>Operativo</strong>
             </div>
         </aside>
         <div class="sidebar-scrim" id="sidebarScrim"></div>

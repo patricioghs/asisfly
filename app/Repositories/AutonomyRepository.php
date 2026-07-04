@@ -14,7 +14,7 @@ final class AutonomyRepository
         if (!$this->databaseReady()) {
             return $this->decorate([
                 'company_id' => $companyId,
-                'learning_progress' => 18,
+                'learning_progress' => 0,
                 'mode' => 'supervised_learning',
                 'approvals_count' => 0,
                 'corrections_count' => 0,
@@ -85,7 +85,7 @@ final class AutonomyRepository
 
     private function ensure(int $companyId): void
     {
-        Database::connection()->prepare('INSERT IGNORE INTO company_ai_autonomy (company_id, learning_progress, mode) VALUES (:company_id, 18, "supervised_learning")')
+        Database::connection()->prepare('INSERT IGNORE INTO company_ai_autonomy (company_id, learning_progress, mode) VALUES (:company_id, 0, "supervised_learning")')
             ->execute(['company_id' => $companyId]);
     }
 
@@ -101,7 +101,15 @@ final class AutonomyRepository
 
     private function decorate(array $row): array
     {
-        $progress = (int) ($row['learning_progress'] ?? 18);
+        $progress = (int) ($row['learning_progress'] ?? 0);
+        if (
+            $progress === 18
+            && (int) ($row['approvals_count'] ?? 0) === 0
+            && (int) ($row['corrections_count'] ?? 0) === 0
+            && (int) ($row['autonomous_actions_count'] ?? 0) === 0
+        ) {
+            $progress = 0;
+        }
         $mode = $this->modeFor($progress);
         $range = match ($mode) {
             'supervised_learning' => '0-25%',

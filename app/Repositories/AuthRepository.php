@@ -92,6 +92,9 @@ final class AuthRepository
             ]);
         }
 
+        $pdo->prepare('INSERT IGNORE INTO company_ai_autonomy (company_id, learning_progress, mode) VALUES (:company_id, 0, "supervised_learning")')
+            ->execute(['company_id' => $companyId]);
+
         $pdo->commit();
 
         return $this->findUserByEmail($input['email']) ?? [];

@@ -20,6 +20,7 @@ final class DashboardController extends Controller
             'metrics' => $repo->dashboard($this->companyId()),
             'alerts' => $repo->alerts($this->companyId()),
             'usage' => $repo->aiUsage($this->companyId()),
+            'integrations' => $repo->integrations($this->companyId()),
             'autonomy' => (new AutonomyRepository())->profile($this->companyId()),
         ]);
     }

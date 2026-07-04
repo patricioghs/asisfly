@@ -4,34 +4,21 @@ foreach ($metrics as $metric) {
     $metricMap[$metric['label']] = $metric;
 }
 $kpis = [
-    ['Ventas del dia', '$2.580.000', '18% vs ayer', 'bi-currency-dollar', 'success'],
-    ['Mensajes respondidos', $metricMap['Mensajes respondidos']['value'] ?? 86, '12% vs ayer', 'bi-chat-dots', 'info'],
-    ['Nuevos clientes', $metricMap['Clientes contactados']['value'] ?? 14, '7% vs ayer', 'bi-person-plus', 'primary'],
-    ['Reuniones hoy', $metricMap['Reuniones agendadas']['value'] ?? 3, 'Hoy 2 pendientes', 'bi-calendar-event', 'warning'],
-    ['Tareas pendientes', $metricMap['Tareas creadas']['value'] ?? 12, '6 urgentes', 'bi-list-check', 'dark'],
+    ['Ventas del dia', '$0', 'Sin ventas registradas hoy', 'bi-currency-dollar', 'success'],
+    ['Mensajes respondidos', $metricMap['Mensajes respondidos']['value'] ?? 0, 'Desde omnicanal', 'bi-chat-dots', 'info'],
+    ['Nuevos clientes', $metricMap['Clientes contactados']['value'] ?? 0, 'Desde CRM', 'bi-person-plus', 'primary'],
+    ['Reuniones hoy', $metricMap['Reuniones agendadas']['value'] ?? 0, 'Desde calendario', 'bi-calendar-event', 'warning'],
+    ['Tareas pendientes', $metricMap['Tareas creadas']['value'] ?? 0, 'Tareas abiertas', 'bi-list-check', 'dark'],
 ];
-$activity = [
-    ['bi-whatsapp', 'Nuevo mensaje de Maria Gonzalez', 'Hola! Quisiera mas informacion...', '10:24', 'success'],
-    ['bi-envelope-at', 'Correo de Proveedor ABC', 'Nueva orden de compra #1258', '09:15', 'danger'],
-    ['bi-calendar2-check', 'Reunion con Constructora Norte', 'Hoy 15:00 - 16:00', '08:45', 'primary'],
-    ['bi-file-earmark-spreadsheet', 'Reporte de ventas generado', 'Venta_Mayo_2026.pdf', '08:30', 'success'],
-    ['bi-receipt', 'Cotizacion enviada a Cliente XYZ', 'Cotizacion #COT-00045', '08:12', 'primary'],
-];
-$recommendations = [
-    ['bi-exclamation-circle', 'Hay 8 clientes que pidieron informacion y no han respondido.', 'warning'],
-    ['bi-calendar-check', 'Tienes 2 cotizaciones por vencer hoy.', 'primary'],
-    ['bi-instagram', 'Publica en Instagram: es el mejor momento para generar alcance.', 'danger'],
-    ['bi-graph-down-arrow', 'Las ventas de este producto bajaron 18% respecto al mes pasado.', 'info'],
-];
-$integrations = [
-    ['Gmail', 'bi-google', 'Conectado'],
-    ['Calendar', 'bi-calendar3', 'Conectado'],
-    ['WhatsApp', 'bi-whatsapp', 'Conectado'],
-    ['Instagram', 'bi-instagram', 'Conectado'],
-    ['Facebook', 'bi-facebook', 'Conectado'],
-];
+$activity = [];
+$recommendations = array_values(array_filter([
+    ($metricMap['Documentos analizados']['value'] ?? 0) == 0 ? ['bi-database-add', 'Carga documentos reales para que AsisFly empiece a aprender de la empresa.', 'primary'] : null,
+    ($metricMap['Clientes contactados']['value'] ?? 0) == 0 ? ['bi-people', 'Agrega clientes al CRM para activar seguimiento comercial.', 'info'] : null,
+    ($metricMap['Mensajes respondidos']['value'] ?? 0) == 0 ? ['bi-inboxes', 'Conecta o registra canales para centralizar mensajes reales.', 'warning'] : null,
+]));
+$integrations = $integrations ?? [];
 $autonomy = $autonomy ?? [
-    'learning_progress' => 18,
+    'learning_progress' => 0,
     'label' => 'Aprendizaje supervisado',
     'range' => '0-25%',
     'description' => 'AsisFly aprende como funciona la empresa. Todo lo que sugiera requiere aprobacion humana.',
@@ -107,6 +94,13 @@ $autonomy = $autonomy ?? [
                 <time><?= e($time) ?></time>
             </div>
         <?php endforeach; ?>
+        <?php if (empty($activity)): ?>
+            <div class="empty-state">
+                <i class="bi bi-clock-history"></i>
+                <strong>Sin actividad reciente</strong>
+                <span>Cuando existan mensajes, tareas, documentos o aprobaciones reales, apareceran aqui.</span>
+            </div>
+        <?php endif; ?>
     </article>
 
     <article class="panel recommendation-panel">
@@ -123,6 +117,13 @@ $autonomy = $autonomy ?? [
                 <strong><?= e($text) ?></strong>
             </div>
         <?php endforeach; ?>
+        <?php if (empty($recommendations)): ?>
+            <div class="empty-state">
+                <i class="bi bi-stars"></i>
+                <strong>Sin recomendaciones aun</strong>
+                <span>AsisFly generara recomendaciones cuando tenga actividad y datos de la empresa.</span>
+            </div>
+        <?php endif; ?>
     </article>
 </section>
 
@@ -135,17 +136,17 @@ $autonomy = $autonomy ?? [
         <span class="soft-badge">Ultimos 7 dias</span>
     </div>
     <div class="performance-summary">
-        <span><small>Ventas</small><strong>$18.650.000</strong><em>16%</em></span>
-        <span><small>Mensajes</small><strong>432</strong><em>11%</em></span>
-        <span><small>Nuevos clientes</small><strong>37</strong><em>15%</em></span>
-        <span><small>Conversion</small><strong>8,6%</strong><em>6%</em></span>
+        <span><small>Ventas</small><strong>$0</strong><em>Sin datos</em></span>
+        <span><small>Mensajes</small><strong><?= e((string) ($metricMap['Mensajes respondidos']['value'] ?? 0)) ?></strong><em>Real</em></span>
+        <span><small>Nuevos clientes</small><strong><?= e((string) ($metricMap['Clientes contactados']['value'] ?? 0)) ?></strong><em>Real</em></span>
+        <span><small>Conversion</small><strong>0%</strong><em>Sin datos</em></span>
     </div>
     <div class="chart-card" aria-label="Grafico de rendimiento general">
         <div class="chart-grid"></div>
-        <svg viewBox="0 0 900 230" role="img" aria-label="Ventas y mensajes ultimos 7 dias">
-            <polyline class="chart-line chart-line-blue" points="0,170 120,150 240,135 360,95 480,70 600,88 720,142 900,92"></polyline>
-            <polyline class="chart-line chart-line-green" points="0,190 120,160 240,178 360,142 480,135 600,130 720,72 900,104"></polyline>
-        </svg>
+        <div class="empty-state compact">
+            <strong>Sin datos para graficar</strong>
+            <p>Cuando registres ventas, mensajes o clientes, el rendimiento aparecera aqui.</p>
+        </div>
     </div>
 </section>
 
@@ -158,7 +159,19 @@ $autonomy = $autonomy ?? [
         <a href="<?= url('/integrations') ?>">Ver todas <i class="bi bi-arrow-right"></i></a>
     </div>
     <div class="integration-strip">
-        <?php foreach ($integrations as [$name, $icon, $status]): ?>
+        <?php foreach ($integrations as $integration): ?>
+            <?php
+                $name = $integration['name'] ?? 'Integracion';
+                $status = $integration['status'] ?? 'Pendiente';
+                $icon = match (true) {
+                    str_contains(strtolower((string) $name), 'whatsapp') => 'bi-whatsapp',
+                    str_contains(strtolower((string) $name), 'instagram') => 'bi-instagram',
+                    str_contains(strtolower((string) $name), 'facebook') => 'bi-facebook',
+                    str_contains(strtolower((string) $name), 'calendar') => 'bi-calendar3',
+                    str_contains(strtolower((string) $name), 'gmail') => 'bi-google',
+                    default => 'bi-plug',
+                };
+            ?>
             <span><i class="bi <?= e($icon) ?>"></i><strong><?= e($name) ?></strong><small><?= e($status) ?></small></span>
         <?php endforeach; ?>
         <a href="<?= url('/integrations') ?>"><i class="bi bi-plus-lg"></i><strong>Agregar</strong><small>Nuevo canal</small></a>

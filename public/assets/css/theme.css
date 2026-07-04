@@ -659,6 +659,19 @@ a {
   height: calc(100% - 56px);
 }
 
+.chart-card .empty-state {
+  align-content: center;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px dashed var(--asisty-border);
+  border-radius: 14px;
+  display: grid;
+  inset: 44px;
+  justify-items: center;
+  position: absolute;
+  text-align: center;
+  z-index: 1;
+}
+
 .chart-line {
   fill: none;
   stroke-linecap: round;

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS company_ai_autonomy (
   company_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
-  learning_progress TINYINT UNSIGNED NOT NULL DEFAULT 18,
+  learning_progress TINYINT UNSIGNED NOT NULL DEFAULT 0,
   mode ENUM('supervised_learning','copilot','controlled_autonomy','autonomous') NOT NULL DEFAULT 'supervised_learning',
   approvals_count INT UNSIGNED NOT NULL DEFAULT 0,
   corrections_count INT UNSIGNED NOT NULL DEFAULT 0,
