@@ -65,6 +65,13 @@ $baseRoles = [
 
 $preserved = ['plans', 'roles'];
 $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+$missingTables = array_diff(['plans', 'roles', 'companies', 'users', 'assistant_settings', 'integrations'], $tables);
+
+if ($missingTables !== []) {
+    fwrite(STDERR, "La base de datos no tiene el esquema instalado. Faltan tablas: " . implode(', ', $missingTables) . "\n");
+    fwrite(STDERR, "Ejecuta primero: php database/install.php\n");
+    exit(1);
+}
 
 $pdo->beginTransaction();
 $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
