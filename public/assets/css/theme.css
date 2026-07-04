@@ -1685,8 +1685,9 @@ a {
 
 .connected-accounts-shell {
   display: grid;
-  gap: 20px;
-  grid-template-columns: 360px minmax(0, 1fr);
+  align-items: start;
+  gap: 22px;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
 }
 
 .account-create-panel,
@@ -1713,12 +1714,12 @@ a {
 .account-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .account-card {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .account-card-head {
@@ -1730,9 +1731,15 @@ a {
 
 .account-card-head h2 {
   color: var(--asisty-text);
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 850;
   margin: 0;
+}
+
+.account-card-head p {
+  color: var(--asisty-muted);
+  font-size: 0.84rem;
+  margin: 3px 0 0;
 }
 
 .account-icon {
@@ -1745,6 +1752,159 @@ a {
   height: 44px;
   justify-content: center;
   width: 44px;
+}
+
+.account-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.account-status-strip span {
+  align-items: center;
+  background: var(--asisty-surface-soft);
+  border: 1px solid var(--asisty-border);
+  border-radius: 999px;
+  color: var(--asisty-text);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 7px;
+  padding: 7px 10px;
+}
+
+.account-status-strip i {
+  color: var(--asisty-primary);
+}
+
+.account-credential-summary {
+  align-items: start;
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.92), rgba(255, 255, 255, 0.98));
+  border: 1px solid var(--asisty-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(210px, 0.9fr) minmax(0, 1.6fr);
+  padding: 16px;
+}
+
+.account-credential-summary.is-ready {
+  border-color: rgba(16, 185, 129, 0.32);
+  box-shadow: inset 3px 0 0 rgba(16, 185, 129, 0.8);
+}
+
+.account-credential-summary.is-pending {
+  border-color: rgba(249, 115, 22, 0.34);
+  box-shadow: inset 3px 0 0 rgba(249, 115, 22, 0.8);
+}
+
+.account-credential-summary strong {
+  color: var(--asisty-text);
+  display: block;
+  font-size: 1rem;
+  font-weight: 850;
+  margin-top: 3px;
+}
+
+.account-credential-summary small {
+  color: var(--asisty-muted);
+  display: block;
+  margin-top: 4px;
+}
+
+.account-credential-summary dl {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+.account-credential-summary div {
+  min-width: 0;
+}
+
+.account-credential-summary dt {
+  color: var(--asisty-muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.account-credential-summary dd {
+  color: var(--asisty-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.account-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.account-actions-row form {
+  margin: 0;
+}
+
+.account-details {
+  background: var(--asisty-surface-soft);
+  border: 1px solid var(--asisty-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.account-details summary {
+  align-items: center;
+  color: var(--asisty-text);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 850;
+  justify-content: space-between;
+  list-style: none;
+  padding: 14px 16px;
+}
+
+.account-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.account-details summary i {
+  color: var(--asisty-muted);
+  transition: transform 0.18s ease;
+}
+
+.account-details[open] summary {
+  border-bottom: 1px solid var(--asisty-border);
+}
+
+.account-details[open] summary i {
+  transform: rotate(180deg);
+}
+
+.account-details .account-card-form {
+  padding: 16px;
+}
+
+.account-empty-state {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.account-empty-state h2 {
+  color: var(--asisty-text);
+  font-size: 1.1rem;
+  margin: 0 0 4px;
+}
+
+.account-empty-state p {
+  color: var(--asisty-muted);
+  margin: 0;
 }
 
 .account-form-row,
@@ -2683,6 +2843,9 @@ a {
 [data-bs-theme="dark"] .notifications-live-card,
 [data-bs-theme="dark"] .notification-card,
 [data-bs-theme="dark"] .notification-rule,
+[data-bs-theme="dark"] .account-status-strip span,
+[data-bs-theme="dark"] .account-credential-summary,
+[data-bs-theme="dark"] .account-details,
 [data-bs-theme="dark"] .form-control,
 [data-bs-theme="dark"] .form-select,
 [data-bs-theme="dark"] .btn-outline-secondary,
@@ -2732,7 +2895,11 @@ a {
 [data-bs-theme="dark"] .notifications-hero h2,
 [data-bs-theme="dark"] .notifications-live-card strong,
 [data-bs-theme="dark"] .notification-card h3,
-[data-bs-theme="dark"] .notification-rule strong {
+[data-bs-theme="dark"] .notification-rule strong,
+[data-bs-theme="dark"] .account-card-head h2,
+[data-bs-theme="dark"] .account-credential-summary strong,
+[data-bs-theme="dark"] .account-credential-summary dd,
+[data-bs-theme="dark"] .account-empty-state h2 {
   color: #f8fafc;
 }
 
@@ -2824,7 +2991,6 @@ a {
 
   .dashboard-kpis,
   .performance-summary,
-  .account-grid,
   .approval-metrics,
   .workbench-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2861,7 +3027,6 @@ a {
   .dashboard-kpis,
   .performance-summary,
   .integration-strip,
-  .account-grid,
   .approval-metrics,
   .workbench-metrics,
   .workbench-card,
@@ -2871,6 +3036,13 @@ a {
   .approval-card-main,
   .account-form-row,
   .account-toggle-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-card-head,
+  .account-credential-summary,
+  .account-credential-summary dl,
+  .account-empty-state {
     grid-template-columns: 1fr;
   }
 

@@ -76,130 +76,189 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
     </aside>
 
     <section class="account-grid">
+        <?php if (empty($accounts)): ?>
+            <article class="panel account-empty-state">
+                <div class="account-icon"><i class="bi bi-plug"></i></div>
+                <div>
+                    <span class="eyebrow">Sin cuentas conectadas</span>
+                    <h2>Agrega tu primer canal de trabajo</h2>
+                    <p>Crea una cuenta de correo, WhatsApp o red social para que AsisFly pueda recibir mensajes, sugerir respuestas y centralizar la operacion.</p>
+                </div>
+            </article>
+        <?php endif; ?>
         <?php foreach ($accounts as $account): ?>
+            <?php
+                $credential = $account['credential_summary'] ?? [];
+                $hasCredentials = !empty($credential['is_configured']);
+                $isEmailProvider = in_array($account['provider'], ['imap', 'gmail', 'outlook'], true);
+            ?>
             <article class="panel account-card">
                 <div class="account-card-head">
                     <div class="account-icon"><i class="bi <?= e($channelIcons[$account['channel']] ?? 'bi-plug') ?>"></i></div>
                     <div>
                         <span class="eyebrow"><?= e($providerLabels[$account['provider']] ?? $account['provider']) ?></span>
                         <h2><?= e($account['display_name']) ?></h2>
+                        <p><?= e($account['external_account_id'] ?: 'Sin identificador publico') ?></p>
                     </div>
                     <span class="status status-<?= e($account['status']) ?>"><i class="bi bi-plug"></i><?= e($statusLabels[$account['status']] ?? $account['status']) ?></span>
                 </div>
-                <form class="account-card-form" method="post" action="<?= url('/integrations/accounts/update') ?>">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
-                    <label>
-                        <span>Nombre</span>
-                        <input class="form-control" name="display_name" value="<?= e($account['display_name']) ?>">
-                    </label>
-                    <label>
-                        <span>Identificador</span>
-                        <input class="form-control" name="external_account_id" value="<?= e($account['external_account_id'] ?? '') ?>">
-                    </label>
-                    <div class="account-form-row">
-                        <label>
-                            <span>Estado</span>
-                            <select class="form-select" name="status">
-                                <?php foreach ($statusLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= $account['status'] === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label>
-                            <span>Uso principal</span>
-                            <select class="form-select" name="brain_key">
-                                <?php foreach ($brainLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= ($account['brain_key'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
-                            </select>
-                        </label>
-                    </div>
-                    <label>
-                        <span>Responsable</span>
-                        <select class="form-select" name="assigned_user_id">
-                            <option value="">Sin responsable fijo</option>
-                            <?php foreach ($users as $user): ?><option value="<?= e((string) $user['id']) ?>" <?= (string) ($account['assigned_user_id'] ?? '') === (string) $user['id'] ? 'selected' : '' ?>><?= e($user['name']) ?></option><?php endforeach; ?>
-                        </select>
-                    </label>
-                    <div class="account-toggle-grid">
-                        <label><input type="checkbox" name="inbound_enabled" value="1" <?= !empty($account['inbound_enabled']) ? 'checked' : '' ?>><span>Recibir</span></label>
-                        <label><input type="checkbox" name="outbound_enabled" value="1" <?= !empty($account['outbound_enabled']) ? 'checked' : '' ?>><span>Enviar</span></label>
-                        <label><input type="checkbox" name="requires_approval" value="1" <?= !empty($account['requires_approval']) ? 'checked' : '' ?>><span>Aprobar</span></label>
-                    </div>
-                    <div class="account-token">
-                        <span>Credenciales</span>
-                        <code><?= !empty($account['credentials_updated_at']) ? 'Cifradas: ' . e((string) ($account['credentials_last4'] ?? 'configuradas')) : 'Sin credenciales' ?></code>
-                    </div>
-                    <button class="btn btn-outline-primary w-100">Guardar cambios</button>
-                </form>
 
-                <?php if (in_array($account['provider'], ['imap', 'gmail', 'outlook'], true)): ?>
-                    <form class="account-card-form mt-3" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
+                <div class="account-status-strip">
+                    <span><i class="bi bi-inbox"></i><?= !empty($account['inbound_enabled']) ? 'Recibe mensajes' : 'Entrada pausada' ?></span>
+                    <span><i class="bi bi-send"></i><?= !empty($account['outbound_enabled']) ? 'Envio habilitado' : 'Envio en aprobacion' ?></span>
+                    <span><i class="bi bi-shield-check"></i><?= !empty($account['requires_approval']) ? 'Requiere aprobacion' : 'Puede ejecutar' ?></span>
+                    <span><i class="bi bi-diagram-3"></i><?= e($brainLabels[$account['brain_key'] ?? ''] ?? 'Uso general') ?></span>
+                </div>
+
+                <div class="account-credential-summary <?= $hasCredentials ? 'is-ready' : 'is-pending' ?>">
+                    <div>
+                        <span class="eyebrow">Credenciales</span>
+                        <strong><?= $hasCredentials ? 'Configuradas y cifradas' : 'Pendientes de configurar' ?></strong>
+                        <small><?= $hasCredentials ? 'Ultima actualizacion: ' . e((string) ($credential['updated_at'] ?? '-')) : 'Guarda los datos tecnicos para activar pruebas de conexion.' ?></small>
+                    </div>
+                    <?php if ($isEmailProvider): ?>
+                        <dl>
+                            <div><dt>IMAP</dt><dd><?= e((string) ($credential['imap_host'] ?? 'No registrado')) ?><?= !empty($credential['imap_port']) ? ':' . e((string) $credential['imap_port']) : '' ?></dd></div>
+                            <div><dt>SMTP</dt><dd><?= e((string) ($credential['smtp_host'] ?? 'No registrado')) ?><?= !empty($credential['smtp_port']) ? ':' . e((string) $credential['smtp_port']) : '' ?></dd></div>
+                            <div><dt>Usuario</dt><dd><?= e((string) ($credential['username'] ?? $credential['email_address'] ?? 'No registrado')) ?></dd></div>
+                        </dl>
+                    <?php elseif ($account['provider'] === 'obraok'): ?>
+                        <dl>
+                            <div><dt>API</dt><dd><?= e((string) ($credential['api_base_url'] ?? 'No registrada')) ?></dd></div>
+                            <div><dt>Workspace</dt><dd><?= e((string) ($credential['workspace_id'] ?? 'No registrado')) ?></dd></div>
+                        </dl>
+                    <?php else: ?>
+                        <dl>
+                            <div><dt>Proveedor</dt><dd><?= e($providerLabels[$account['provider']] ?? $account['provider']) ?></dd></div>
+                            <div><dt>Cuenta</dt><dd><?= e($account['external_account_id'] ?: 'No registrada') ?></dd></div>
+                        </dl>
+                    <?php endif; ?>
+                </div>
+
+                <div class="account-actions-row">
+                    <?php if ($hasCredentials): ?>
+                        <form method="post" action="<?= url('/integrations/accounts/test') ?>">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
+                            <button class="btn btn-primary"><i class="bi bi-wifi"></i> Probar conexion</button>
+                        </form>
+                    <?php endif; ?>
+                    <a class="btn btn-outline-primary" href="<?= url('/inbox') ?>"><i class="bi bi-inboxes"></i> Ver mensajes</a>
+                </div>
+
+                <details class="account-details">
+                    <summary><span>Configuracion de cuenta</span><i class="bi bi-chevron-down"></i></summary>
+                    <form class="account-card-form" method="post" action="<?= url('/integrations/accounts/update') ?>">
                         <?= csrf_field() ?>
                         <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
-                        <input type="hidden" name="email_address" value="<?= e($account['external_account_id'] ?? '') ?>">
                         <div class="account-form-row">
                             <label>
-                                <span>IMAP host</span>
-                                <input class="form-control" name="imap_host" placeholder="imap.empresa.com">
+                                <span>Nombre</span>
+                                <input class="form-control" name="display_name" value="<?= e($account['display_name']) ?>">
                             </label>
                             <label>
-                                <span>Puerto</span>
-                                <select class="form-select" name="imap_port">
-                                    <option value="993">993 SSL</option>
-                                    <option value="143">143 TLS/None</option>
+                                <span>Identificador</span>
+                                <input class="form-control" name="external_account_id" value="<?= e($account['external_account_id'] ?? '') ?>">
+                            </label>
+                        </div>
+                        <div class="account-form-row">
+                            <label>
+                                <span>Estado</span>
+                                <select class="form-select" name="status">
+                                    <?php foreach ($statusLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= $account['status'] === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label>
+                                <span>Uso principal</span>
+                                <select class="form-select" name="brain_key">
+                                    <?php foreach ($brainLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= ($account['brain_key'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
                                 </select>
                             </label>
                         </div>
-                        <div class="account-form-row">
-                            <label>
-                                <span>SMTP host</span>
-                                <input class="form-control" name="smtp_host" placeholder="smtp.empresa.com">
-                            </label>
-                            <label>
-                                <span>Puerto</span>
-                                <select class="form-select" name="smtp_port">
-                                    <option value="587">587 TLS</option>
-                                    <option value="465">465 SSL</option>
-                                    <option value="25">25</option>
-                                </select>
-                            </label>
+                        <label>
+                            <span>Responsable</span>
+                            <select class="form-select" name="assigned_user_id">
+                                <option value="">Sin responsable fijo</option>
+                                <?php foreach ($users as $user): ?><option value="<?= e((string) $user['id']) ?>" <?= (string) ($account['assigned_user_id'] ?? '') === (string) $user['id'] ? 'selected' : '' ?>><?= e($user['name']) ?></option><?php endforeach; ?>
+                            </select>
+                        </label>
+                        <div class="account-toggle-grid">
+                            <label><input type="checkbox" name="inbound_enabled" value="1" <?= !empty($account['inbound_enabled']) ? 'checked' : '' ?>><span>Recibir</span></label>
+                            <label><input type="checkbox" name="outbound_enabled" value="1" <?= !empty($account['outbound_enabled']) ? 'checked' : '' ?>><span>Enviar</span></label>
+                            <label><input type="checkbox" name="requires_approval" value="1" <?= !empty($account['requires_approval']) ? 'checked' : '' ?>><span>Aprobar</span></label>
                         </div>
-                        <div class="account-form-row">
-                            <label>
-                                <span>Usuario</span>
-                                <input class="form-control" name="username" placeholder="correo@empresa.com">
-                            </label>
-                            <label>
-                                <span>Clave</span>
-                                <input class="form-control" type="password" name="password" placeholder="Clave o app password" autocomplete="new-password">
-                            </label>
-                        </div>
-                        <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar credenciales correo</button>
+                        <button class="btn btn-outline-primary w-100">Guardar cambios</button>
                     </form>
+                </details>
+
+                <?php if ($isEmailProvider): ?>
+                    <details class="account-details">
+                        <summary><span><?= $hasCredentials ? 'Actualizar credenciales de correo' : 'Configurar credenciales de correo' ?></span><i class="bi bi-chevron-down"></i></summary>
+                        <form class="account-card-form" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
+                            <input type="hidden" name="email_address" value="<?= e($account['external_account_id'] ?? '') ?>">
+                            <div class="account-form-row">
+                                <label>
+                                    <span>IMAP host</span>
+                                    <input class="form-control" name="imap_host" value="<?= e((string) ($credential['imap_host'] ?? '')) ?>" placeholder="imap.empresa.com">
+                                </label>
+                                <label>
+                                    <span>Puerto IMAP</span>
+                                    <select class="form-select" name="imap_port">
+                                        <option value="993" <?= (string) ($credential['imap_port'] ?? '993') === '993' ? 'selected' : '' ?>>993 SSL</option>
+                                        <option value="143" <?= (string) ($credential['imap_port'] ?? '') === '143' ? 'selected' : '' ?>>143 TLS/None</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="account-form-row">
+                                <label>
+                                    <span>SMTP host</span>
+                                    <input class="form-control" name="smtp_host" value="<?= e((string) ($credential['smtp_host'] ?? '')) ?>" placeholder="smtp.empresa.com">
+                                </label>
+                                <label>
+                                    <span>Puerto SMTP</span>
+                                    <select class="form-select" name="smtp_port">
+                                        <option value="587" <?= (string) ($credential['smtp_port'] ?? '587') === '587' ? 'selected' : '' ?>>587 TLS</option>
+                                        <option value="465" <?= (string) ($credential['smtp_port'] ?? '') === '465' ? 'selected' : '' ?>>465 SSL</option>
+                                        <option value="25" <?= (string) ($credential['smtp_port'] ?? '') === '25' ? 'selected' : '' ?>>25</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="account-form-row">
+                                <label>
+                                    <span>Usuario</span>
+                                    <input class="form-control" name="username" value="<?= e((string) ($credential['username'] ?? '')) ?>" placeholder="correo@empresa.com">
+                                </label>
+                                <label>
+                                    <span>Nueva clave</span>
+                                    <input class="form-control" type="password" name="password" placeholder="<?= $hasCredentials ? 'Dejar vacio mantiene la clave actual' : 'Clave o app password' ?>" autocomplete="new-password">
+                                </label>
+                            </div>
+                            <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar credenciales correo</button>
+                        </form>
+                    </details>
                 <?php elseif ($account['provider'] === 'obraok'): ?>
-                    <form class="account-card-form mt-3" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
-                        <label>
-                            <span>URL API</span>
-                            <input class="form-control" name="api_base_url" placeholder="https://api.obraok.cl">
-                        </label>
-                        <label>
-                            <span>Token API</span>
-                            <input class="form-control" type="password" name="api_token" placeholder="Token o API key" autocomplete="new-password">
-                        </label>
-                        <label>
-                            <span>Workspace / empresa</span>
-                            <input class="form-control" name="workspace_id" placeholder="ID de cuenta o proyecto">
-                        </label>
-                        <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar credenciales ObraOK</button>
-                    </form>
-                <?php endif; ?>
-
-                <?php if (!empty($account['credentials_updated_at'])): ?>
-                    <form class="mt-2" method="post" action="<?= url('/integrations/accounts/test') ?>">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
-                        <button class="btn btn-primary w-100"><i class="bi bi-wifi"></i> Probar conexion</button>
-                    </form>
+                    <details class="account-details">
+                        <summary><span><?= $hasCredentials ? 'Actualizar credenciales ObraOK' : 'Configurar credenciales ObraOK' ?></span><i class="bi bi-chevron-down"></i></summary>
+                        <form class="account-card-form" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
+                            <label>
+                                <span>URL API</span>
+                                <input class="form-control" name="api_base_url" value="<?= e((string) ($credential['api_base_url'] ?? '')) ?>" placeholder="https://api.obraok.cl">
+                            </label>
+                            <label>
+                                <span>Token API</span>
+                                <input class="form-control" type="password" name="api_token" placeholder="<?= $hasCredentials ? 'Dejar vacio mantiene el token actual' : 'Token o API key' ?>" autocomplete="new-password">
+                            </label>
+                            <label>
+                                <span>Workspace / empresa</span>
+                                <input class="form-control" name="workspace_id" value="<?= e((string) ($credential['workspace_id'] ?? '')) ?>" placeholder="ID de cuenta o proyecto">
+                            </label>
+                            <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar credenciales ObraOK</button>
+                        </form>
+                    </details>
                 <?php endif; ?>
             </article>
         <?php endforeach; ?>

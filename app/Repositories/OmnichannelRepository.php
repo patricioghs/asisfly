@@ -19,7 +19,7 @@ final class OmnichannelRepository
 
         $statement = Database::connection()->prepare('SELECT * FROM omnichannel_accounts WHERE company_id = :company_id ORDER BY channel, display_name, provider');
         $statement->execute(['company_id' => $companyId]);
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        return array_map(fn (array $account): array => $this->withCredentialSummary($account), $statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
     public function accountMetrics(int $companyId): array
@@ -259,22 +259,63 @@ final class OmnichannelRepository
         return is_array($decoded) ? $decoded : null;
     }
 
+    private function withCredentialSummary(array $account): array
+    {
+        $credentials = $this->decryptCredentials($account);
+        $summary = [
+            'is_configured' => !empty($account['credentials_updated_at']),
+            'type' => null,
+            'label' => !empty($account['credentials_updated_at']) ? (string) ($account['credentials_last4'] ?? 'Configuradas') : 'Sin credenciales',
+            'updated_at' => $account['credentials_updated_at'] ?? null,
+        ];
+
+        if (is_array($credentials)) {
+            $summary['type'] = $credentials['type'] ?? null;
+            if (($credentials['type'] ?? '') === 'obraok_api') {
+                $summary += [
+                    'api_base_url' => (string) ($credentials['api_base_url'] ?? ''),
+                    'workspace_id' => (string) ($credentials['workspace_id'] ?? ''),
+                ];
+            } else {
+                $summary += [
+                    'email_address' => (string) ($credentials['email_address'] ?? $account['external_account_id'] ?? ''),
+                    'username' => (string) ($credentials['username'] ?? ''),
+                    'imap_host' => (string) ($credentials['imap_host'] ?? ''),
+                    'imap_port' => (int) ($credentials['imap_port'] ?? 993),
+                    'imap_encryption' => (string) ($credentials['imap_encryption'] ?? 'ssl'),
+                    'smtp_host' => (string) ($credentials['smtp_host'] ?? ''),
+                    'smtp_port' => (int) ($credentials['smtp_port'] ?? 587),
+                    'smtp_encryption' => (string) ($credentials['smtp_encryption'] ?? 'tls'),
+                ];
+            }
+        }
+
+        unset($account['encrypted_credentials']);
+        $account['credential_summary'] = $summary;
+
+        return $account;
+    }
+
     private function credentialsFromInput(array $account, array $input): array
     {
+        $existing = $this->decryptCredentials($account) ?? [];
+
         if (($account['provider'] ?? '') === 'obraok') {
+            $apiToken = trim((string) ($input['api_token'] ?? ''));
             return [
                 'type' => 'obraok_api',
                 'api_base_url' => trim((string) ($input['api_base_url'] ?? '')),
-                'api_token' => trim((string) ($input['api_token'] ?? '')),
+                'api_token' => $apiToken !== '' ? $apiToken : (string) ($existing['api_token'] ?? ''),
                 'workspace_id' => trim((string) ($input['workspace_id'] ?? '')),
             ];
         }
 
+        $password = (string) ($input['password'] ?? '');
         return [
             'type' => 'email_imap_smtp',
             'email_address' => trim((string) ($input['email_address'] ?? $account['external_account_id'] ?? '')),
             'username' => trim((string) ($input['username'] ?? '')),
-            'password' => (string) ($input['password'] ?? ''),
+            'password' => $password !== '' ? $password : (string) ($existing['password'] ?? ''),
             'imap_host' => trim((string) ($input['imap_host'] ?? '')),
             'imap_port' => (int) ($input['imap_port'] ?? 993),
             'imap_encryption' => $this->encryption((string) ($input['imap_encryption'] ?? 'ssl')),
