@@ -1,3 +1,43 @@
+<?php
+$providerOptions = [
+    'simulated' => 'Simulado seguro',
+    'openai' => 'OpenAI',
+    'anthropic' => 'Anthropic Claude (preparado)',
+    'gemini' => 'Google Gemini (preparado)',
+    'local' => 'Modelo local (preparado)',
+];
+$modelOptions = [
+    'gpt-4.1-mini' => 'OpenAI GPT-4.1 mini - recomendado',
+    'gpt-4.1' => 'OpenAI GPT-4.1 - mayor capacidad',
+    'gpt-4o-mini' => 'OpenAI GPT-4o mini - economico',
+    'gpt-4o' => 'OpenAI GPT-4o - multimodal',
+    'asisfly-demo-latam' => 'AsisFly simulado - sin costo',
+];
+$temperatureOptions = [
+    '0.2' => 'Preciso y conservador',
+    '0.4' => 'Equilibrado - recomendado',
+    '0.7' => 'Creativo comercial',
+    '1.0' => 'Muy creativo',
+];
+$tokenLimitOptions = [
+    '100000' => '100.000 tokens - prueba',
+    '500000' => '500.000 tokens - starter',
+    '3000000' => '3.000.000 tokens - pro',
+    '15000000' => '15.000.000 tokens - business',
+    '-1' => 'Sin limite manual',
+];
+$costLimitOptions = [
+    '10' => 'USD 10 / mes',
+    '25' => 'USD 25 / mes',
+    '100' => 'USD 100 / mes',
+    '500' => 'USD 500 / mes',
+    '-1' => 'Sin limite manual',
+];
+$currentTemperature = number_format((float) ($aiSettings['temperature'] ?? 0.4), 1, '.', '');
+$currentTokenLimit = (string) ($aiSettings['monthly_token_limit'] ?? 500000);
+$currentCostLimit = (string) (float) ($aiSettings['monthly_cost_limit'] ?? 25);
+$keySourceLabels = ['managed' => 'Clave cargada en plataforma', 'env' => 'Respaldo tecnico .env', 'missing' => 'Sin clave'];
+?>
 <section class="panel ai-config">
     <div>
         <span class="eyebrow">Motor IA</span>
@@ -15,23 +55,37 @@
         <label>
             <span>Proveedor principal</span>
             <select class="form-select" name="provider">
-                <?php foreach (['simulated' => 'Simulado', 'openai' => 'OpenAI', 'anthropic' => 'Anthropic Claude', 'gemini' => 'Google Gemini', 'local' => 'Modelo local'] as $value => $label): ?>
+                <?php foreach ($providerOptions as $value => $label): ?>
                     <option value="<?= e($value) ?>" <?= ($aiSettings['provider'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
         <label>
             <span>Modelo</span>
-            <input class="form-control" name="model" value="<?= e($aiSettings['model'] ?? 'gpt-4.1-mini') ?>">
+            <select class="form-select" name="model">
+                <?php foreach ($modelOptions as $value => $label): ?>
+                    <option value="<?= e($value) ?>" <?= ($aiSettings['model'] ?? 'gpt-4.1-mini') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
         </label>
         <label>
-            <span>Variable API key de respaldo</span>
-            <input class="form-control" name="api_key_env" value="<?= e($aiSettings['api_key_env'] ?? 'OPENAI_API_KEY') ?>">
-            <small class="text-secondary">Fuente actual: <?= e((string) ($aiSettings['api_key_source'] ?? 'missing')) ?><?= !empty($aiSettings['api_key_last4']) ? ' · ****' . e((string) $aiSettings['api_key_last4']) : '' ?></small>
+            <span>Clave OpenAI</span>
+            <input type="hidden" name="api_key_env" value="OPENAI_API_KEY">
+            <div class="form-control d-flex align-items-center justify-content-between">
+                <span><?= e($keySourceLabels[$aiSettings['api_key_source'] ?? 'missing'] ?? 'Sin clave') ?></span>
+                <?php if (!empty($aiSettings['api_key_last4'])): ?>
+                    <strong>****<?= e((string) $aiSettings['api_key_last4']) ?></strong>
+                <?php endif; ?>
+            </div>
+            <small class="text-secondary">La clave real se administra desde Superadmin &gt; IA y tokens.</small>
         </label>
         <label>
-            <span>Temperatura</span>
-            <input class="form-control" type="number" step="0.1" min="0" max="2" name="temperature" value="<?= e((string) ($aiSettings['temperature'] ?? 0.4)) ?>">
+            <span>Estilo de respuesta</span>
+            <select class="form-select" name="temperature">
+                <?php foreach ($temperatureOptions as $value => $label): ?>
+                    <option value="<?= e($value) ?>" <?= $currentTemperature === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
         </label>
         <label>
             <span>Fallback</span>
@@ -43,15 +97,27 @@
         </label>
         <label>
             <span>Modelo fallback</span>
-            <input class="form-control" name="fallback_model" value="<?= e($aiSettings['fallback_model'] ?? 'asisfly-demo-latam') ?>">
+            <select class="form-select" name="fallback_model">
+                <?php foreach (['asisfly-demo-latam' => 'AsisFly simulado - recomendado', 'gpt-4.1-mini' => 'OpenAI GPT-4.1 mini'] as $value => $label): ?>
+                    <option value="<?= e($value) ?>" <?= ($aiSettings['fallback_model'] ?? 'asisfly-demo-latam') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
         </label>
         <label>
             <span>Limite tokens mes</span>
-            <input class="form-control" type="number" name="monthly_token_limit" value="<?= e((string) ($aiSettings['monthly_token_limit'] ?? 500000)) ?>">
+            <select class="form-select" name="monthly_token_limit">
+                <?php foreach ($tokenLimitOptions as $value => $label): ?>
+                    <option value="<?= e($value) ?>" <?= $currentTokenLimit === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
         </label>
         <label>
             <span>Limite costo mes USD</span>
-            <input class="form-control" type="number" step="0.01" name="monthly_cost_limit" value="<?= e((string) ($aiSettings['monthly_cost_limit'] ?? 25)) ?>">
+            <select class="form-select" name="monthly_cost_limit">
+                <?php foreach ($costLimitOptions as $value => $label): ?>
+                    <option value="<?= e($value) ?>" <?= $currentCostLimit === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
         </label>
         <label class="toggle-line">
             <input type="checkbox" name="is_enabled" value="1" <?= !empty($aiSettings['is_enabled']) ? 'checked' : '' ?>>
