@@ -23,7 +23,7 @@ final class AiProviderRepository
             'api_key_last4' => null,
             'api_key_updated_at' => null,
             'has_managed_api_key' => false,
-            'api_key_source' => trim((string) env('OPENAI_API_KEY', '')) !== '' ? 'env' : 'missing',
+            'api_key_source' => $this->fallbackKeySource(),
             'temperature' => 0.4,
             'monthly_token_limit' => 500000,
             'monthly_cost_limit' => 25.0,
@@ -53,7 +53,7 @@ final class AiProviderRepository
             'api_key_last4' => $row['api_key_last4'] ?? null,
             'api_key_updated_at' => $row['api_key_updated_at'] ?? null,
             'has_managed_api_key' => !empty($row['encrypted_api_key']),
-            'api_key_source' => !empty($row['encrypted_api_key']) ? 'managed' : (trim((string) env($row['api_key_env'] ?: 'OPENAI_API_KEY', '')) !== '' ? 'env' : 'missing'),
+            'api_key_source' => !empty($row['encrypted_api_key']) ? 'managed' : $this->fallbackKeySource($row['api_key_env'] ?: 'OPENAI_API_KEY'),
             'temperature' => (float) $row['temperature'],
             'monthly_token_limit' => (int) $row['monthly_token_limit'],
             'monthly_cost_limit' => (float) $row['monthly_cost_limit'],
@@ -115,6 +115,74 @@ final class AiProviderRepository
         ]);
     }
 
+    public function savePlatformApiKey(string $provider, string $apiKey, ?int $userId = null): void
+    {
+        if (!Database::available()) {
+            return;
+        }
+
+        $provider = $this->cleanProvider($provider);
+        if ($provider === 'simulated') {
+            $provider = 'openai';
+        }
+
+        $vault = new SecretVault();
+        Database::connection()->prepare(
+            "INSERT INTO platform_api_keys (provider, encrypted_api_key, api_key_last4, updated_by_user_id)
+             VALUES (:provider, :encrypted_api_key, :api_key_last4, :updated_by_user_id)
+             ON DUPLICATE KEY UPDATE encrypted_api_key = VALUES(encrypted_api_key), api_key_last4 = VALUES(api_key_last4), updated_by_user_id = VALUES(updated_by_user_id), updated_at = CURRENT_TIMESTAMP"
+        )->execute([
+            'provider' => $provider,
+            'encrypted_api_key' => $vault->encrypt($apiKey),
+            'api_key_last4' => $vault->last4($apiKey),
+            'updated_by_user_id' => $userId,
+        ]);
+    }
+
+    public function forgetPlatformApiKey(string $provider): void
+    {
+        if (!Database::available()) {
+            return;
+        }
+
+        Database::connection()
+            ->prepare('DELETE FROM platform_api_keys WHERE provider = :provider')
+            ->execute(['provider' => $this->cleanProvider($provider)]);
+    }
+
+    public function platformCredentialStatus(string $provider = 'openai'): array
+    {
+        $fallback = [
+            'provider' => $provider,
+            'source' => trim((string) env('OPENAI_API_KEY', '')) !== '' ? '.env' : 'Sin clave',
+            'last4' => null,
+            'updated_at' => null,
+        ];
+
+        if (!Database::available()) {
+            return $fallback;
+        }
+
+        try {
+            $statement = Database::connection()->prepare('SELECT provider, encrypted_api_key, api_key_last4, updated_at FROM platform_api_keys WHERE provider = :provider LIMIT 1');
+            $statement->execute(['provider' => $provider]);
+            $row = $statement->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable) {
+            return $fallback;
+        }
+
+        if (!$row) {
+            return $fallback;
+        }
+
+        return [
+            'provider' => $row['provider'],
+            'source' => 'Global',
+            'last4' => $row['api_key_last4'] ?? null,
+            'updated_at' => $row['updated_at'] ?? null,
+        ];
+    }
+
     public function companyCredentialStatus(): array
     {
         if (!Database::available()) {
@@ -138,6 +206,7 @@ final class AiProviderRepository
         }
 
         return array_map(function (array $row): array {
+            $platform = $this->platformCredentialStatus('openai');
             $envKey = trim((string) env('OPENAI_API_KEY', ''));
             return [
                 'id' => (int) $row['id'],
@@ -145,7 +214,7 @@ final class AiProviderRepository
                 'plan' => $row['plan'] ?? '-',
                 'provider' => $row['provider'] ?: 'simulated',
                 'model' => $row['model'] ?: env('OPENAI_DEFAULT_MODEL', 'gpt-4.1-mini'),
-                'source' => !empty($row['encrypted_api_key']) ? 'Plataforma' : ($envKey !== '' ? '.env' : 'Sin clave'),
+                'source' => !empty($row['encrypted_api_key']) ? 'Empresa' : (($platform['source'] ?? '') === 'Global' ? 'Global' : ($envKey !== '' ? '.env' : 'Sin clave')),
                 'last4' => $row['api_key_last4'] ?? null,
                 'updated_at' => $row['api_key_updated_at'] ?? null,
             ];
@@ -170,7 +239,29 @@ final class AiProviderRepository
             return $managed;
         }
 
+        $platform = $this->resolvedPlatformApiKey('openai');
+        if ($platform) {
+            return $platform;
+        }
+
         return trim((string) env($settings['api_key_env'] ?? 'OPENAI_API_KEY', ''));
+    }
+
+    public function resolvedPlatformApiKey(string $provider = 'openai'): string
+    {
+        if (!Database::available()) {
+            return '';
+        }
+
+        try {
+            $statement = Database::connection()->prepare('SELECT encrypted_api_key FROM platform_api_keys WHERE provider = :provider LIMIT 1');
+            $statement->execute(['provider' => $this->cleanProvider($provider)]);
+            $encrypted = $statement->fetchColumn();
+        } catch (Throwable) {
+            return '';
+        }
+
+        return (string) ((new SecretVault())->decrypt(is_string($encrypted) ? $encrypted : null) ?? '');
     }
 
     public function planLimits(int $companyId): array
@@ -239,6 +330,16 @@ final class AiProviderRepository
     {
         $provider = strtolower(trim($provider));
         return in_array($provider, ['openai', 'anthropic', 'gemini', 'local', 'simulated'], true) ? $provider : 'simulated';
+    }
+
+    private function fallbackKeySource(string $envName = 'OPENAI_API_KEY'): string
+    {
+        $platform = $this->platformCredentialStatus('openai');
+        if (($platform['source'] ?? '') === 'Global') {
+            return 'global';
+        }
+
+        return trim((string) env($envName, '')) !== '' ? 'env' : 'missing';
     }
 
     private function lowestPositiveLimit(int $a, int $b): int

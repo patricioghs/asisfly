@@ -9,6 +9,17 @@ use App\Core\Database;
 $pdo = Database::connection();
 $database = (string) config('database.database');
 
+$pdo->exec("CREATE TABLE IF NOT EXISTS platform_api_keys (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  provider VARCHAR(80) NOT NULL UNIQUE,
+  encrypted_api_key TEXT NOT NULL,
+  api_key_last4 VARCHAR(12) NULL,
+  updated_by_user_id BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+echo 'Tabla verificada: platform_api_keys' . PHP_EOL;
+
 $columns = $pdo->prepare('SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = :database AND TABLE_NAME = "ai_provider_settings"');
 $columns->execute(['database' => $database]);
 $existing = array_flip(array_column($columns->fetchAll(), 'COLUMN_NAME'));

@@ -84,11 +84,41 @@
     <?php elseif ($type === 'usage'): ?>
         <div class="section-heading">
             <div>
-                <span class="eyebrow">Credenciales administradas</span>
-                <h3>OpenAI desde Superadmin</h3>
-                <p class="text-secondary mb-0">Guarda la API key cifrada por empresa. La clave no se muestra nuevamente despues de guardarla.</p>
+                <span class="eyebrow">Credencial global</span>
+                <h3>OpenAI para toda la plataforma</h3>
+                <p class="text-secondary mb-0">Guarda una sola API key central. Todas las empresas la usan si no tienen una clave propia.</p>
             </div>
-            <span class="status-pill"><i class="bi bi-key"></i> Cifrado con APP_KEY</span>
+            <?php if (($platformCredential['source'] ?? '') === 'Global'): ?>
+                <span class="status-pill success"><i class="bi bi-check2-circle"></i> Global ****<?= e((string) ($platformCredential['last4'] ?? '')) ?></span>
+            <?php else: ?>
+                <span class="status-pill warning"><i class="bi bi-exclamation-triangle"></i> Sin clave global</span>
+            <?php endif; ?>
+        </div>
+        <form method="post" action="<?= url('/admin/ai-tokens/platform-openai-key') ?>" class="row g-3 mb-4">
+            <?= csrf_field() ?>
+            <div class="col-md-8">
+                <label class="form-label">API key OpenAI global</label>
+                <input class="form-control" type="password" name="openai_api_key" placeholder="sk-proj-..." autocomplete="new-password" spellcheck="false" required>
+                <small class="text-secondary">Se cifra con APP_KEY. No se muestra nuevamente despues de guardarla.</small>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100"><i class="bi bi-shield-lock"></i> Guardar</button>
+            </div>
+        </form>
+        <?php if (($platformCredential['source'] ?? '') === 'Global'): ?>
+            <form method="post" action="<?= url('/admin/ai-tokens/platform-openai-key/delete') ?>" class="mb-4">
+                <?= csrf_field() ?>
+                <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Eliminar clave global</button>
+            </form>
+        <?php endif; ?>
+
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Credenciales por empresa</span>
+                <h3>Excepciones por cliente</h3>
+                <p class="text-secondary mb-0">Opcional: usa esto solo si una empresa Enterprise quiere pagar o administrar su propia API key.</p>
+            </div>
+            <span class="status-pill"><i class="bi bi-key"></i> Opcional</span>
         </div>
         <form method="post" action="<?= url('/admin/ai-tokens/openai-key') ?>" class="row g-3 mb-4">
             <?= csrf_field() ?>
@@ -96,7 +126,7 @@
                 <label class="form-label">Empresa</label>
                 <select class="form-select" name="company_id" required>
                     <?php foreach (($credentials ?? []) as $credential): ?>
-                        <option value="<?= e((string) $credential['id']) ?>"><?= e($credential['name']) ?> · <?= e($credential['plan']) ?></option>
+                        <option value="<?= e((string) $credential['id']) ?>"><?= e($credential['name']) ?> - <?= e($credential['plan']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -119,8 +149,10 @@
                             <td><?= e($credential['provider']) ?></td>
                             <td><?= e($credential['model']) ?></td>
                             <td>
-                                <?php if ($credential['source'] === 'Plataforma'): ?>
-                                    <span class="status-pill success"><i class="bi bi-check2-circle"></i> Plataforma · ****<?= e((string) $credential['last4']) ?></span>
+                                <?php if ($credential['source'] === 'Empresa'): ?>
+                                    <span class="status-pill success"><i class="bi bi-check2-circle"></i> Empresa ****<?= e((string) $credential['last4']) ?></span>
+                                <?php elseif ($credential['source'] === 'Global'): ?>
+                                    <span class="status-pill success"><i class="bi bi-globe2"></i> Global</span>
                                 <?php elseif ($credential['source'] === '.env'): ?>
                                     <span class="status-pill"><i class="bi bi-terminal"></i> .env</span>
                                 <?php else: ?>
@@ -129,7 +161,7 @@
                             </td>
                             <td><?= e((string) ($credential['updated_at'] ?? '-')) ?></td>
                             <td class="text-end">
-                                <?php if ($credential['source'] === 'Plataforma'): ?>
+                                <?php if ($credential['source'] === 'Empresa'): ?>
                                     <form method="post" action="<?= url('/admin/ai-tokens/openai-key/delete') ?>">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="company_id" value="<?= e((string) $credential['id']) ?>">
@@ -167,3 +199,5 @@
         </div>
     <?php endif; ?>
 </section>
+
+

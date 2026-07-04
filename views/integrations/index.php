@@ -36,7 +36,7 @@ $costLimitOptions = [
 $currentTemperature = number_format((float) ($aiSettings['temperature'] ?? 0.4), 1, '.', '');
 $currentTokenLimit = (string) ($aiSettings['monthly_token_limit'] ?? 500000);
 $currentCostLimit = (string) (float) ($aiSettings['monthly_cost_limit'] ?? 25);
-$keySourceLabels = ['managed' => 'Clave cargada en plataforma', 'env' => 'Respaldo tecnico .env', 'missing' => 'Sin clave'];
+$keySourceLabels = ['managed' => 'Clave propia de empresa', 'global' => 'Clave global de plataforma', 'env' => 'Respaldo tecnico .env', 'missing' => 'Sin clave'];
 ?>
 <section class="panel ai-config">
     <div>

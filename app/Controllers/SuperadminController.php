@@ -80,9 +80,39 @@ final class SuperadminController extends Controller
             'title' => 'IA y tokens',
             'description' => 'Claves API administradas por Superadmin, consumo global de IA, modelos, costos estimados y limites por empresa.',
             'cards' => (new TenantRepository())->aiUsage($this->companyId()),
+            'platformCredential' => $aiRepo->platformCredentialStatus('openai'),
             'credentials' => $aiRepo->companyCredentialStatus(),
             'type' => 'usage',
         ]);
+    }
+
+    public function savePlatformOpenAiKey(): void
+    {
+        $this->requirePermission('*');
+
+        $apiKey = $this->normalizeOpenAiKey((string) ($_POST['openai_api_key'] ?? ''));
+        if (!$this->isValidOpenAiKey($apiKey)) {
+            $_SESSION['flash_error'] = 'Ingresa una API key global de OpenAI valida. Debe comenzar con sk- o sk-proj-.';
+            $this->redirect('/admin/ai-tokens');
+        }
+
+        try {
+            (new AiProviderRepository())->savePlatformApiKey('openai', $apiKey, (int) ($_SESSION['user']['id'] ?? 0));
+            $_SESSION['flash_success'] = 'Clave global OpenAI guardada. Todas las empresas la usaran si no tienen clave propia.';
+        } catch (Throwable $exception) {
+            $_SESSION['flash_error'] = 'No se pudo guardar la clave global: ' . $exception->getMessage();
+        }
+
+        $this->redirect('/admin/ai-tokens');
+    }
+
+    public function deletePlatformOpenAiKey(): void
+    {
+        $this->requirePermission('*');
+
+        (new AiProviderRepository())->forgetPlatformApiKey('openai');
+        $_SESSION['flash_success'] = 'Clave global OpenAI eliminada.';
+        $this->redirect('/admin/ai-tokens');
     }
 
     public function saveOpenAiKey(): void
@@ -90,10 +120,15 @@ final class SuperadminController extends Controller
         $this->requirePermission('*');
 
         $companyId = (int) ($_POST['company_id'] ?? 0);
-        $apiKey = trim((string) ($_POST['openai_api_key'] ?? ''));
+        $apiKey = $this->normalizeOpenAiKey((string) ($_POST['openai_api_key'] ?? ''));
 
-        if ($companyId < 1 || $apiKey === '' || !str_starts_with($apiKey, 'sk-')) {
-            $_SESSION['flash_error'] = 'Selecciona empresa e ingresa una API key valida de OpenAI.';
+        if ($companyId < 1) {
+            $_SESSION['flash_error'] = 'Selecciona la empresa donde se usara la clave OpenAI.';
+            $this->redirect('/admin/ai-tokens');
+        }
+
+        if (!$this->isValidOpenAiKey($apiKey)) {
+            $_SESSION['flash_error'] = 'Ingresa una API key de OpenAI valida. Debe comenzar con sk- o sk-proj-.';
             $this->redirect('/admin/ai-tokens');
         }
 
@@ -105,6 +140,16 @@ final class SuperadminController extends Controller
         }
 
         $this->redirect('/admin/ai-tokens');
+    }
+
+    private function normalizeOpenAiKey(string $apiKey): string
+    {
+        return (string) preg_replace('/\s+/', '', trim($apiKey, " \t\n\r\0\x0B\"'"));
+    }
+
+    private function isValidOpenAiKey(string $apiKey): bool
+    {
+        return str_starts_with($apiKey, 'sk-') && strlen($apiKey) >= 30;
     }
 
     public function deleteOpenAiKey(): void

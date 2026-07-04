@@ -114,7 +114,9 @@ Despues de actualizar codigo, ejecutar una vez:
 php database/upgrade_superadmin_api_keys.php
 ```
 
-Luego entrar como Superadmin a `Administracion > IA y tokens` y guardar la API key de OpenAI para la empresa correspondiente. La clave queda cifrada y solo se muestra su estado y ultimos 4 caracteres.
+Luego entrar como Superadmin a `Administracion > IA y tokens` y guardar la API key en `OpenAI para toda la plataforma`. Esa clave global queda cifrada y la usaran todas las empresas que no tengan una clave propia.
+
+Las claves por empresa quedan solo como excepcion Enterprise, por ejemplo cuando un cliente quiere pagar o administrar su propio consumo OpenAI.
 
 Finalmente entrar a `Integraciones`, seleccionar:
 
