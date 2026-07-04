@@ -73,7 +73,6 @@ if ($missingTables !== []) {
     exit(1);
 }
 
-$pdo->beginTransaction();
 $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
 foreach ($tables as $table) {
     if (!in_array($table, $preserved, true)) {
@@ -170,8 +169,6 @@ if (in_array('company_ai_autonomy', $tables, true)) {
             'mode' => 'supervised_learning',
         ]);
 }
-
-$pdo->commit();
 
 echo "Workspace real creado.\n";
 echo "Empresa: {$options['company']} (ID {$companyId})\n";
