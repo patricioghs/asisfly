@@ -108,6 +108,7 @@ $router->post('/integrations/accounts', [IntegrationController::class, 'saveAcco
 $router->post('/integrations/accounts/update', [IntegrationController::class, 'updateAccount']);
 $router->post('/integrations/accounts/credentials', [IntegrationController::class, 'saveAccountCredentials']);
 $router->post('/integrations/accounts/test', [IntegrationController::class, 'testAccountCredentials']);
+$router->post('/integrations/accounts/sync-email', [IntegrationController::class, 'syncAccountEmail']);
 $router->get('/apis', [ApiController::class, 'index']);
 $router->get('/company', [CompanyController::class, 'profile']);
 $router->get('/users', [CompanyController::class, 'users']);

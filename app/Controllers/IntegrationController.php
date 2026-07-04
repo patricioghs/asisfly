@@ -147,4 +147,18 @@ final class IntegrationController extends Controller
 
         $this->redirect('/integrations/accounts');
     }
+
+    public function syncAccountEmail(): void
+    {
+        $this->requireAuth();
+
+        $result = (new OmnichannelRepository())->syncEmailAccount($this->companyId(), (int) ($_POST['account_id'] ?? 0));
+        if ($result['ok']) {
+            $_SESSION['flash_success'] = $result['message'];
+        } else {
+            $_SESSION['flash_error'] = $result['message'];
+        }
+
+        $this->redirect('/inbox');
+    }
 }

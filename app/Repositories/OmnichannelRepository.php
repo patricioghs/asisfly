@@ -167,6 +167,86 @@ final class OmnichannelRepository
         return $result;
     }
 
+    public function syncEmailAccount(int $companyId, int $accountId, int $limit = 15): array
+    {
+        $account = $this->account($companyId, $accountId);
+        if (!$account || !in_array((string) ($account['provider'] ?? ''), ['imap', 'gmail', 'outlook'], true)) {
+            return ['ok' => false, 'message' => 'Selecciona una cuenta de correo valida.', 'imported' => 0];
+        }
+
+        if (empty($account['inbound_enabled'])) {
+            return ['ok' => false, 'message' => 'La entrada de esta cuenta esta pausada.', 'imported' => 0];
+        }
+
+        $credentials = $this->decryptCredentials($account);
+        if (!$credentials) {
+            return ['ok' => false, 'message' => 'Primero guarda las credenciales IMAP de esta cuenta.', 'imported' => 0];
+        }
+
+        if (!function_exists('imap_open')) {
+            return ['ok' => false, 'message' => 'La extension IMAP de PHP no esta habilitada en este servidor.', 'imported' => 0];
+        }
+
+        $mailboxPath = $this->mailboxPath($credentials);
+        $username = (string) ($credentials['username'] ?? $credentials['email_address'] ?? '');
+        $password = (string) ($credentials['password'] ?? '');
+        if ($mailboxPath === '' || $username === '' || $password === '') {
+            return ['ok' => false, 'message' => 'Credenciales IMAP incompletas.', 'imported' => 0];
+        }
+
+        $mailbox = @imap_open($mailboxPath, $username, $password, OP_READONLY, 1);
+        if (!$mailbox) {
+            return ['ok' => false, 'message' => 'No se pudo abrir IMAP: ' . (imap_last_error() ?: 'sin detalle'), 'imported' => 0];
+        }
+
+        $uids = imap_search($mailbox, 'UNSEEN', SE_UID) ?: imap_search($mailbox, 'ALL', SE_UID) ?: [];
+        rsort($uids, SORT_NUMERIC);
+        $uids = array_slice($uids, 0, max(1, min($limit, 50)));
+        $imported = 0;
+        $skipped = 0;
+
+        foreach ($uids as $uid) {
+            $overview = imap_fetch_overview($mailbox, (string) $uid, FT_UID)[0] ?? null;
+            if (!$overview) {
+                $skipped++;
+                continue;
+            }
+
+            $messageId = trim((string) ($overview->message_id ?? '')) ?: 'imap-' . $account['id'] . '-' . $uid;
+            if ($this->messageExists($companyId, $messageId)) {
+                $skipped++;
+                continue;
+            }
+
+            $subject = $this->decodeMime((string) ($overview->subject ?? 'Correo sin asunto'));
+            $from = $this->emailSender((string) ($overview->from ?? 'Cliente Email'));
+            $body = $this->emailBody($mailbox, (int) $uid);
+            if (trim($body) === '') {
+                $body = '(Correo sin cuerpo legible. Revisa el mensaje original en tu bandeja.)';
+            }
+
+            $result = $this->receiveWebhook((string) $account['webhook_token'], [
+                'body' => $body,
+                'customer_name' => $from['name'],
+                'customer_handle' => $from['email'],
+                'email' => $from['email'],
+                'subject' => $subject,
+                'conversation_id' => $this->emailThreadId((int) $account['id'], $from['email'], $subject),
+                'message_id' => $messageId,
+            ]);
+
+            $imported += !empty($result['ok']) ? 1 : 0;
+        }
+
+        imap_close($mailbox);
+
+        return [
+            'ok' => true,
+            'message' => "Sincronizacion completada. Correos nuevos: {$imported}. Omitidos: {$skipped}.",
+            'imported' => $imported,
+        ];
+    }
+
     public function receiveWebhook(string $token, array $payload): array
     {
         if (!$this->databaseReady()) {
@@ -364,6 +444,85 @@ final class OmnichannelRepository
         $statement->execute(['company_id' => $companyId, 'channel' => $channel, 'provider' => $provider]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
+    }
+
+    private function messageExists(int $companyId, string $externalMessageId): bool
+    {
+        $statement = Database::connection()->prepare('SELECT id FROM inbox_messages WHERE company_id = :company_id AND external_message_id = :external_message_id LIMIT 1');
+        $statement->execute(['company_id' => $companyId, 'external_message_id' => $externalMessageId]);
+        return (bool) $statement->fetchColumn();
+    }
+
+    private function mailboxPath(array $credentials): string
+    {
+        $host = trim((string) ($credentials['imap_host'] ?? ''));
+        $port = (int) ($credentials['imap_port'] ?? 993);
+        if ($host === '' || $port <= 0) {
+            return '';
+        }
+
+        $encryption = $this->encryption((string) ($credentials['imap_encryption'] ?? 'ssl'));
+        $flags = $encryption === 'ssl' ? '/imap/ssl/novalidate-cert' : ($encryption === 'tls' ? '/imap/tls/novalidate-cert' : '/imap/notls');
+        return '{' . $host . ':' . $port . $flags . '}INBOX';
+    }
+
+    private function decodeMime(string $value): string
+    {
+        if (!function_exists('imap_mime_header_decode')) {
+            return trim($value);
+        }
+
+        $parts = @imap_mime_header_decode($value) ?: [];
+        $decoded = '';
+        foreach ($parts as $part) {
+            $decoded .= (string) ($part->text ?? '');
+        }
+
+        return trim($decoded) ?: trim($value);
+    }
+
+    private function emailSender(string $from): array
+    {
+        $email = '';
+        $name = $this->decodeMime($from);
+
+        if (function_exists('imap_rfc822_parse_adrlist')) {
+            $addresses = @imap_rfc822_parse_adrlist($from, '');
+            $first = is_array($addresses) ? ($addresses[0] ?? null) : null;
+            if ($first) {
+                $mailbox = (string) ($first->mailbox ?? '');
+                $host = (string) ($first->host ?? '');
+                $email = $mailbox !== '' && $host !== '' ? $mailbox . '@' . $host : '';
+                $personal = $this->decodeMime((string) ($first->personal ?? ''));
+                $name = $personal !== '' ? $personal : ($email ?: $name);
+            }
+        }
+
+        if ($email === '' && preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $from, $matches)) {
+            $email = $matches[0];
+        }
+
+        return ['name' => $name ?: ($email ?: 'Cliente Email'), 'email' => $email ?: null];
+    }
+
+    private function emailBody($mailbox, int $uid): string
+    {
+        $body = (string) @imap_fetchbody($mailbox, (string) $uid, '1', FT_UID | FT_PEEK);
+        if (trim($body) === '') {
+            $body = (string) @imap_body($mailbox, (string) $uid, FT_UID | FT_PEEK);
+        }
+
+        $decoded = quoted_printable_decode($body);
+        $decoded = strip_tags($decoded);
+        $decoded = preg_replace('/\s+/', ' ', $decoded) ?: $decoded;
+
+        return trim(substr($decoded, 0, 6000));
+    }
+
+    private function emailThreadId(int $accountId, ?string $email, string $subject): string
+    {
+        $normalizedSubject = strtolower(trim(preg_replace('/^(re|fw|fwd):\s*/i', '', $subject) ?? $subject));
+        return 'email-' . $accountId . '-' . sha1(($email ?: 'unknown') . '|' . $normalizedSubject);
     }
 
     private function conversation(int $companyId, int $conversationId): ?array

@@ -142,6 +142,13 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
                             <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
                             <button class="btn btn-primary"><i class="bi bi-wifi"></i> Probar conexion</button>
                         </form>
+                        <?php if ($isEmailProvider): ?>
+                            <form method="post" action="<?= url('/integrations/accounts/sync-email') ?>">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
+                                <button class="btn btn-outline-primary"><i class="bi bi-arrow-repeat"></i> Sincronizar correos</button>
+                            </form>
+                        <?php endif; ?>
                     <?php endif; ?>
                     <a class="btn btn-outline-primary" href="<?= url('/inbox') ?>"><i class="bi bi-inboxes"></i> Ver mensajes</a>
                 </div>
