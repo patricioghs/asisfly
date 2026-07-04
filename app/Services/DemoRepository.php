@@ -49,13 +49,13 @@ final class DemoRepository
     public function integrations(): array
     {
         return [
-            ['name' => 'Gmail', 'status' => 'Simulado', 'scope' => 'Correos, borradores, etiquetas'],
-            ['name' => 'Outlook', 'status' => 'Simulado', 'scope' => 'Correos y calendario Microsoft'],
-            ['name' => 'Google Calendar', 'status' => 'Simulado', 'scope' => 'Disponibilidad y eventos'],
-            ['name' => 'WhatsApp Business API', 'status' => 'Sandbox', 'scope' => 'Mensajes y derivacion humana'],
-            ['name' => 'Instagram', 'status' => 'Simulado', 'scope' => 'DM, FAQ y oportunidades'],
-            ['name' => 'Facebook Messenger', 'status' => 'Simulado', 'scope' => 'Mensajeria y CRM'],
-            ['name' => 'Telegram', 'status' => 'Simulado', 'scope' => 'Soporte conversacional'],
+            ['provider' => 'gmail', 'name' => 'Gmail', 'status' => 'Simulado', 'scope' => 'Correos, borradores, etiquetas'],
+            ['provider' => 'outlook', 'name' => 'Outlook', 'status' => 'Simulado', 'scope' => 'Correos y calendario Microsoft'],
+            ['provider' => 'google_calendar', 'name' => 'Google Calendar', 'status' => 'Simulado', 'scope' => 'Disponibilidad y eventos'],
+            ['provider' => 'whatsapp_business', 'name' => 'WhatsApp Business API', 'status' => 'Sandbox', 'scope' => 'Mensajes y derivacion humana'],
+            ['provider' => 'instagram', 'name' => 'Instagram', 'status' => 'Simulado', 'scope' => 'DM, FAQ y oportunidades'],
+            ['provider' => 'facebook', 'name' => 'Facebook Messenger', 'status' => 'Simulado', 'scope' => 'Mensajeria y CRM'],
+            ['provider' => 'telegram', 'name' => 'Telegram', 'status' => 'Simulado', 'scope' => 'Soporte conversacional'],
         ];
     }
 

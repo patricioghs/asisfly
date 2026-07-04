@@ -38,13 +38,14 @@ $currentTokenLimit = (string) ($aiSettings['monthly_token_limit'] ?? 500000);
 $currentCostLimit = (string) (float) ($aiSettings['monthly_cost_limit'] ?? 25);
 $keySourceLabels = ['managed' => 'Clave propia de empresa', 'global' => 'Clave global de plataforma', 'env' => 'Respaldo tecnico .env', 'missing' => 'Sin clave'];
 $canManageAiEngine = !empty($canManageAiEngine);
+$accountConnectorProviders = ['gmail', 'outlook', 'whatsapp_business', 'instagram', 'facebook', 'telegram'];
 ?>
 <?php if (!$canManageAiEngine): ?>
 <section class="panel launch-hero">
     <div>
         <span class="eyebrow">IA empresarial</span>
         <h2>AsisFly IA esta <?= !empty($aiSettings['is_enabled']) ? 'activa' : 'pausada' ?></h2>
-        <p>Tu empresa usa el motor IA administrado por AsisFly. Aqui puedes revisar consumo y conectar tus canales de trabajo.</p>
+        <p>Tu empresa usa el motor IA administrado por AsisFly. Aqui puedes revisar tu uso mensual y conectar tus canales de trabajo.</p>
     </div>
     <a class="btn btn-primary" href="<?= url('/chat') ?>"><i class="bi bi-stars"></i> Usar Chat IA</a>
 </section>
@@ -56,14 +57,14 @@ $canManageAiEngine = !empty($canManageAiEngine);
         <small>Consumo del mes</small>
     </article>
     <article class="metric-card">
-        <span>Costo estimado</span>
-        <strong>USD <?= e(number_format((float) ($aiSettings['monthly_cost_used'] ?? 0), 4)) ?></strong>
-        <small>Auditado por empresa</small>
+        <span>Bolsa incluida</span>
+        <strong><?= ((int) ($aiSettings['monthly_token_limit'] ?? 0)) > 0 ? e(number_format((int) $aiSettings['monthly_token_limit'])) : 'Sin limite' ?></strong>
+        <small>Segun plan contratado</small>
     </article>
     <article class="metric-card">
-        <span>Modelo</span>
-        <strong><?= e((string) ($aiSettings['model'] ?? 'AsisFly IA')) ?></strong>
-        <small><?= e($keySourceLabels[$aiSettings['api_key_source'] ?? 'missing'] ?? 'Administrado por AsisFly') ?></small>
+        <span>Servicio IA</span>
+        <strong>Administrado</strong>
+        <small>Incluido en tu mensualidad AsisFly</small>
     </article>
 </section>
 <?php else: ?>
@@ -174,6 +175,11 @@ $canManageAiEngine = !empty($canManageAiEngine);
 
 <div class="row g-3 mt-3">
     <?php foreach ($integrations as $integration): ?>
+        <?php
+            $provider = (string) ($integration['provider'] ?? '');
+            $targetUrl = in_array($provider, $accountConnectorProviders, true) ? url('/integrations/accounts') : url('/apis');
+            $actionLabel = in_array($provider, $accountConnectorProviders, true) ? 'Conectar cuenta' : 'Ver API';
+        ?>
         <div class="col-md-6 col-xl-4">
             <article class="panel integration-card">
                 <div class="d-flex justify-content-between align-items-start">
@@ -181,7 +187,7 @@ $canManageAiEngine = !empty($canManageAiEngine);
                     <span class="badge text-bg-secondary"><?= e($integration['status']) ?></span>
                 </div>
                 <p><?= e($integration['scope']) ?></p>
-                <button class="btn btn-outline-primary btn-sm">Configurar</button>
+                <a class="btn btn-outline-primary btn-sm" href="<?= e($targetUrl) ?>"><?= e($actionLabel) ?></a>
             </article>
         </div>
     <?php endforeach; ?>

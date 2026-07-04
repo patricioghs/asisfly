@@ -341,7 +341,12 @@ final class TenantRepository
 
         return array_map(function (array $row) use ($labels, $statuses): array {
             [$name, $scope] = $labels[$row['provider']] ?? [ucfirst($row['provider']), 'Conector externo'];
-            return ['name' => $name, 'status' => $statuses[$row['status']] ?? 'Pendiente', 'scope' => $scope];
+            return [
+                'provider' => $row['provider'],
+                'name' => $name,
+                'status' => $statuses[$row['status']] ?? 'Pendiente',
+                'scope' => $scope,
+            ];
         }, $statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
