@@ -169,82 +169,102 @@ final class OmnichannelRepository
 
     public function syncEmailAccount(int $companyId, int $accountId, int $limit = 15): array
     {
-        $account = $this->account($companyId, $accountId);
-        if (!$account || !in_array((string) ($account['provider'] ?? ''), ['imap', 'gmail', 'outlook'], true)) {
-            return ['ok' => false, 'message' => 'Selecciona una cuenta de correo valida.', 'imported' => 0];
-        }
+        $mailbox = null;
 
-        if (empty($account['inbound_enabled'])) {
-            return ['ok' => false, 'message' => 'La entrada de esta cuenta esta pausada.', 'imported' => 0];
-        }
-
-        $credentials = $this->decryptCredentials($account);
-        if (!$credentials) {
-            return ['ok' => false, 'message' => 'Primero guarda las credenciales IMAP de esta cuenta.', 'imported' => 0];
-        }
-
-        if (!function_exists('imap_open')) {
-            return ['ok' => false, 'message' => 'La extension IMAP de PHP no esta habilitada en este servidor.', 'imported' => 0];
-        }
-
-        $mailboxPath = $this->mailboxPath($credentials);
-        $username = (string) ($credentials['username'] ?? $credentials['email_address'] ?? '');
-        $password = (string) ($credentials['password'] ?? '');
-        if ($mailboxPath === '' || $username === '' || $password === '') {
-            return ['ok' => false, 'message' => 'Credenciales IMAP incompletas.', 'imported' => 0];
-        }
-
-        $mailbox = @imap_open($mailboxPath, $username, $password, OP_READONLY, 1);
-        if (!$mailbox) {
-            return ['ok' => false, 'message' => 'No se pudo abrir IMAP: ' . (imap_last_error() ?: 'sin detalle'), 'imported' => 0];
-        }
-
-        $uids = imap_search($mailbox, 'UNSEEN', SE_UID) ?: imap_search($mailbox, 'ALL', SE_UID) ?: [];
-        rsort($uids, SORT_NUMERIC);
-        $uids = array_slice($uids, 0, max(1, min($limit, 50)));
-        $imported = 0;
-        $skipped = 0;
-
-        foreach ($uids as $uid) {
-            $overview = imap_fetch_overview($mailbox, (string) $uid, FT_UID)[0] ?? null;
-            if (!$overview) {
-                $skipped++;
-                continue;
+        try {
+            $account = $this->account($companyId, $accountId);
+            if (!$account || !in_array((string) ($account['provider'] ?? ''), ['imap', 'gmail', 'outlook'], true)) {
+                return ['ok' => false, 'message' => 'Selecciona una cuenta de correo valida.', 'imported' => 0];
             }
 
-            $messageId = trim((string) ($overview->message_id ?? '')) ?: 'imap-' . $account['id'] . '-' . $uid;
-            if ($this->messageExists($companyId, $messageId)) {
-                $skipped++;
-                continue;
+            if (empty($account['inbound_enabled'])) {
+                return ['ok' => false, 'message' => 'La entrada de esta cuenta esta pausada.', 'imported' => 0];
             }
 
-            $subject = $this->decodeMime((string) ($overview->subject ?? 'Correo sin asunto'));
-            $from = $this->emailSender((string) ($overview->from ?? 'Cliente Email'));
-            $body = $this->emailBody($mailbox, (int) $uid);
-            if (trim($body) === '') {
-                $body = '(Correo sin cuerpo legible. Revisa el mensaje original en tu bandeja.)';
+            $credentials = $this->decryptCredentials($account);
+            if (!$credentials) {
+                return ['ok' => false, 'message' => 'Primero guarda las credenciales IMAP de esta cuenta.', 'imported' => 0];
             }
 
-            $result = $this->receiveWebhook((string) $account['webhook_token'], [
-                'body' => $body,
-                'customer_name' => $from['name'],
-                'customer_handle' => $from['email'],
-                'email' => $from['email'],
-                'subject' => $subject,
-                'conversation_id' => $this->emailThreadId((int) $account['id'], $from['email'], $subject),
-                'message_id' => $messageId,
-            ]);
+            if (!function_exists('imap_open')) {
+                return ['ok' => false, 'message' => 'La extension IMAP de PHP no esta habilitada en este servidor.', 'imported' => 0];
+            }
 
-            $imported += !empty($result['ok']) ? 1 : 0;
+            $mailboxPath = $this->mailboxPath($credentials);
+            $username = (string) ($credentials['username'] ?? $credentials['email_address'] ?? '');
+            $password = (string) ($credentials['password'] ?? '');
+            if ($mailboxPath === '' || $username === '' || $password === '') {
+                return ['ok' => false, 'message' => 'Credenciales IMAP incompletas.', 'imported' => 0];
+            }
+
+            $mailbox = @imap_open($mailboxPath, $username, $password, OP_READONLY, 1);
+            if (!$mailbox) {
+                return ['ok' => false, 'message' => 'No se pudo abrir IMAP: ' . (imap_last_error() ?: 'sin detalle'), 'imported' => 0];
+            }
+
+            $uids = imap_search($mailbox, 'UNSEEN', SE_UID) ?: imap_search($mailbox, 'ALL', SE_UID) ?: [];
+            rsort($uids, SORT_NUMERIC);
+            $uids = array_slice($uids, 0, max(1, min($limit, 50)));
+            $imported = 0;
+            $skipped = 0;
+            $lastError = null;
+
+            foreach ($uids as $uid) {
+                try {
+                    $overviewList = imap_fetch_overview($mailbox, (string) $uid, FT_UID);
+                    $overview = is_array($overviewList) ? ($overviewList[0] ?? null) : null;
+                    if (!$overview) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    $messageId = trim((string) ($overview->message_id ?? '')) ?: 'imap-' . $account['id'] . '-' . $uid;
+                    $messageId = substr($messageId, 0, 170);
+                    if ($this->messageExists($companyId, $messageId)) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    $subject = $this->decodeMime((string) ($overview->subject ?? 'Correo sin asunto'));
+                    $from = $this->emailSender((string) ($overview->from ?? 'Cliente Email'));
+                    $body = $this->emailBody($mailbox, (int) $uid);
+                    if (trim($body) === '') {
+                        $body = '(Correo sin cuerpo legible. Revisa el mensaje original en tu bandeja.)';
+                    }
+
+                    $result = $this->receiveWebhook((string) $account['webhook_token'], [
+                        'body' => $body,
+                        'customer_name' => $from['name'],
+                        'customer_handle' => $from['email'],
+                        'email' => $from['email'],
+                        'subject' => $subject,
+                        'conversation_id' => $this->emailThreadId((int) $account['id'], $from['email'], $subject),
+                        'message_id' => $messageId,
+                    ]);
+
+                    $imported += !empty($result['ok']) ? 1 : 0;
+                    if (empty($result['ok'])) {
+                        $skipped++;
+                        $lastError = (string) ($result['message'] ?? 'No se pudo importar un correo.');
+                    }
+                } catch (\Throwable $exception) {
+                    $skipped++;
+                    $lastError = $exception->getMessage();
+                }
+            }
+
+            return [
+                'ok' => true,
+                'message' => "Sincronizacion completada. Correos nuevos: {$imported}. Omitidos: {$skipped}." . ($lastError ? ' Ultimo aviso: ' . $lastError : ''),
+                'imported' => $imported,
+            ];
+        } catch (\Throwable $exception) {
+            return ['ok' => false, 'message' => 'No se pudo sincronizar IMAP: ' . $exception->getMessage(), 'imported' => 0];
+        } finally {
+            if (is_resource($mailbox) || (class_exists('\\IMAP\\Connection') && $mailbox instanceof \IMAP\Connection)) {
+                imap_close($mailbox);
+            }
         }
-
-        imap_close($mailbox);
-
-        return [
-            'ok' => true,
-            'message' => "Sincronizacion completada. Correos nuevos: {$imported}. Omitidos: {$skipped}.",
-            'imported' => $imported,
-        ];
     }
 
     public function receiveWebhook(string $token, array $payload): array

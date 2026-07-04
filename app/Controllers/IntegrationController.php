@@ -152,13 +152,18 @@ final class IntegrationController extends Controller
     {
         $this->requireAuth();
 
-        $result = (new OmnichannelRepository())->syncEmailAccount($this->companyId(), (int) ($_POST['account_id'] ?? 0));
-        if ($result['ok']) {
-            $_SESSION['flash_success'] = $result['message'];
-        } else {
+        try {
+            $result = (new OmnichannelRepository())->syncEmailAccount($this->companyId(), (int) ($_POST['account_id'] ?? 0));
+            if ($result['ok']) {
+                $_SESSION['flash_success'] = $result['message'];
+                $this->redirect('/inbox');
+            }
+
             $_SESSION['flash_error'] = $result['message'];
+        } catch (Throwable $exception) {
+            $_SESSION['flash_error'] = 'No se pudo sincronizar la cuenta: ' . $exception->getMessage();
         }
 
-        $this->redirect('/inbox');
+        $this->redirect('/integrations/accounts');
     }
 }
