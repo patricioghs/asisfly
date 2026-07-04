@@ -264,6 +264,41 @@ a {
   font-weight: 800;
 }
 
+.section-heading {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-heading h3 {
+  color: var(--asisty-text);
+  font-size: 1rem;
+  font-weight: 850;
+  margin: 2px 0 0;
+}
+
+.status-pill {
+  align-items: center;
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid rgba(100, 116, 139, 0.14);
+  border-radius: 999px;
+  color: var(--asisty-muted);
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 850;
+  gap: 6px;
+  line-height: 1;
+  padding: 7px 10px;
+}
+
+.status-pill.success {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.18);
+  color: var(--asisty-success);
+}
+
 .eyebrow {
   color: var(--asisty-primary-2);
   font-size: 0.72rem;

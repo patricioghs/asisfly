@@ -6,19 +6,56 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Core\Database;
+use App\Repositories\AuthRepository;
 use App\Repositories\TenantRepository;
+use PDOException;
 
 final class SuperadminController extends Controller
 {
     public function companies(): void
     {
         $this->requirePermission('*');
+        $plans = Database::available() ? Database::connection()->query('SELECT name FROM plans ORDER BY monthly_price')->fetchAll() : [];
         $this->view('superadmin/show', [
             'title' => 'Empresas',
             'description' => 'Control global de empresas, planes, usuarios, estado y consumo.',
             'cards' => (new TenantRepository())->companies(),
+            'plans' => $plans,
             'type' => 'companies',
         ]);
+    }
+
+    public function storeCompany(): void
+    {
+        $this->requirePermission('*');
+
+        $input = [
+            'company' => trim((string) ($_POST['company'] ?? '')),
+            'name' => trim((string) ($_POST['owner_name'] ?? '')),
+            'email' => trim((string) ($_POST['owner_email'] ?? '')),
+            'password' => (string) ($_POST['password'] ?? ''),
+            'country' => trim((string) ($_POST['country'] ?? 'Chile')),
+            'currency' => strtoupper(trim((string) ($_POST['currency'] ?? 'CLP'))),
+            'timezone' => trim((string) ($_POST['timezone'] ?? 'America/Santiago')),
+            'locale' => trim((string) ($_POST['locale'] ?? 'es_CL')),
+            'plan' => trim((string) ($_POST['plan'] ?? 'Starter')),
+        ];
+
+        if ($input['company'] === '' || $input['name'] === '' || !filter_var($input['email'], FILTER_VALIDATE_EMAIL) || strlen($input['password']) < 8) {
+            $_SESSION['flash_error'] = 'Completa empresa, dueno, email valido y contrasena de al menos 8 caracteres.';
+            $this->redirect('/admin/companies');
+        }
+
+        try {
+            if (Database::available()) {
+                (new AuthRepository())->createCompanyOwner($input);
+            }
+            $_SESSION['flash_success'] = 'Empresa creada con dueno inicial.';
+        } catch (PDOException) {
+            $_SESSION['flash_error'] = 'No se pudo crear la empresa. Revisa si el correo ya existe.';
+        }
+
+        $this->redirect('/admin/companies');
     }
 
     public function plans(): void

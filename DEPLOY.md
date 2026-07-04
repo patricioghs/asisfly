@@ -68,6 +68,27 @@ cd /var/www/html/staging-asisfly
 php database/install.php
 ```
 
+## Limpieza de demo y cuenta real inicial
+
+Cuando la app ya esta instalada y se quiera empezar a usar con datos reales, ejecutar una sola vez:
+
+```bash
+cd /var/www/html/staging-asisfly
+php database/prepare_real_workspace.php \
+  --confirm=LIMPIAR_ASISFLY \
+  --company="Nombre Empresa" \
+  --name="Nombre Administrador" \
+  --email="admin@empresa.cl" \
+  --password="CAMBIAR_PASSWORD_SEGURO" \
+  --country="Chile" \
+  --currency="CLP" \
+  --timezone="America/Santiago" \
+  --locale="es_CL" \
+  --plan="Business"
+```
+
+Este comando elimina datos demo/transaccionales, conserva planes y roles, crea la empresa real inicial, crea el usuario superadmin y deja integraciones en modo simulado/sandbox.
+
 ## Permisos
 
 ```bash

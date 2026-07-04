@@ -37,7 +37,10 @@ final class AuthRepository
         $pdo = Database::connection();
         $pdo->beginTransaction();
 
-        $planId = (int) $pdo->query("SELECT id FROM plans WHERE name = 'Starter' LIMIT 1")->fetchColumn();
+        $planName = $input['plan'] ?? 'Starter';
+        $plan = $pdo->prepare('SELECT id FROM plans WHERE name = :name LIMIT 1');
+        $plan->execute(['name' => $planName]);
+        $planId = (int) ($plan->fetchColumn() ?: $pdo->query("SELECT id FROM plans WHERE name = 'Starter' LIMIT 1")->fetchColumn());
         $ownerRoleId = (int) $pdo->query("SELECT id FROM roles WHERE name = 'Dueno de empresa' LIMIT 1")->fetchColumn();
 
         $company = $pdo->prepare('INSERT INTO companies (name, legal_name, country, currency, timezone, locale, plan_id, status) VALUES (:name, :legal_name, :country, :currency, :timezone, :locale, :plan_id, :status)');
@@ -92,6 +95,28 @@ final class AuthRepository
         $pdo->commit();
 
         return $this->findUserByEmail($input['email']) ?? [];
+    }
+
+    public function createUser(int $companyId, array $input): void
+    {
+        $roleId = (int) ($input['role_id'] ?? 0);
+        if ($roleId <= 0) {
+            $statement = Database::connection()->prepare("SELECT id FROM roles WHERE name = 'Ejecutivo' LIMIT 1");
+            $statement->execute();
+            $roleId = (int) $statement->fetchColumn();
+        }
+
+        $statement = Database::connection()->prepare('INSERT INTO users (company_id, role_id, name, email, password_hash, locale, timezone, status) VALUES (:company_id, :role_id, :name, :email, :password_hash, :locale, :timezone, :status)');
+        $statement->execute([
+            'company_id' => $companyId,
+            'role_id' => $roleId,
+            'name' => $input['name'],
+            'email' => $input['email'],
+            'password_hash' => password_hash($input['password'], PASSWORD_DEFAULT),
+            'locale' => $input['locale'] ?? 'es_CL',
+            'timezone' => $input['timezone'] ?? 'America/Santiago',
+            'status' => $input['status'] ?? 'active',
+        ]);
     }
 
     public function createPasswordReset(string $email): ?string

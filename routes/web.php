@@ -108,12 +108,14 @@ $router->post('/integrations/accounts/update', [IntegrationController::class, 'u
 $router->get('/apis', [ApiController::class, 'index']);
 $router->get('/company', [CompanyController::class, 'profile']);
 $router->get('/users', [CompanyController::class, 'users']);
+$router->post('/users', [CompanyController::class, 'storeUser']);
 $router->get('/roles', [CompanyController::class, 'roles']);
 $router->get('/company-settings', [CompanyController::class, 'settings']);
 $router->get('/billing', [BillingController::class, 'index']);
 $router->post('/billing/plan', [BillingController::class, 'changePlan']);
 $router->get('/admin', [AdminController::class, 'index']);
 $router->get('/admin/companies', [SuperadminController::class, 'companies']);
+$router->post('/admin/companies', [SuperadminController::class, 'storeCompany']);
 $router->get('/admin/plans', [SuperadminController::class, 'plans']);
 $router->get('/admin/ai-tokens', [SuperadminController::class, 'aiTokens']);
 $router->get('/admin/audit-logs', [SuperadminController::class, 'auditLogs']);
