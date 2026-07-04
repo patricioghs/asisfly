@@ -6,15 +6,23 @@ require_once dirname(__DIR__) . '/app/Core/bootstrap.php';
 
 $db = config('database');
 $database = $db['database'];
+$autoCreate = strtolower((string) env('DB_AUTO_CREATE', 'true'));
+$shouldCreateDatabase = in_array($autoCreate, ['1', 'true', 'yes', 'on'], true);
 $dsn = "mysql:host={$db['host']};port={$db['port']};charset={$db['charset']}";
+
+if (!$shouldCreateDatabase) {
+    $dsn = "mysql:host={$db['host']};port={$db['port']};dbname={$database};charset={$db['charset']}";
+}
 
 $pdo = new PDO($dsn, $db['username'], $db['password'], [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ]);
 
-$pdo->exec("CREATE DATABASE IF NOT EXISTS `{$database}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-$pdo->exec("USE `{$database}`");
+if ($shouldCreateDatabase) {
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$database}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $pdo->exec("USE `{$database}`");
+}
 
 foreach ([
     __DIR__ . '/migrations/001_initial_schema.sql',

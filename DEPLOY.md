@@ -38,20 +38,33 @@ nano .env
 
 Configurar `APP_URL`, credenciales MySQL y proveedor IA si aplica.
 
-## Base de datos
+Para staging actual:
 
-Crear base y usuario:
-
-```sql
-CREATE DATABASE asisfly_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'asisfly_user'@'localhost' IDENTIFIED BY 'CAMBIAR_PASSWORD';
-GRANT ALL PRIVILEGES ON asisfly_staging.* TO 'asisfly_user'@'localhost';
-FLUSH PRIVILEGES;
+```env
+APP_URL=https://staging-asisfly.tilo.cl
+DB_DATABASE=asisfly_latam
+DB_USERNAME=catalogo_user
+DB_AUTO_CREATE=false
 ```
 
-Ejecutar instalador:
+## Base de datos
+
+La base de datos de staging ya existe:
+
+```sql
+asisfly_latam
+```
+
+El usuario configurado es:
 
 ```bash
+catalogo_user
+```
+
+Verificar que el `.env` tenga `DB_PASSWORD` real y ejecutar importacion:
+
+```bash
+cd /var/www/html/staging-asisfly
 php database/install.php
 ```
 
@@ -77,7 +90,7 @@ sudo systemctl reload nginx
 Luego activar SSL:
 
 ```bash
-sudo certbot --nginx -d staging-asisfly.tudominio.com
+sudo certbot --nginx -d staging-asisfly.tilo.cl
 ```
 
 ## Actualizacion
