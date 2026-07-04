@@ -109,4 +109,32 @@ final class IntegrationController extends Controller
         $_SESSION['flash_success'] = 'Cuenta conectada actualizada.';
         $this->redirect('/integrations/accounts');
     }
+
+    public function saveAccountCredentials(): void
+    {
+        $this->requireAuth();
+
+        try {
+            (new OmnichannelRepository())->saveCredentials($this->companyId(), (int) ($_POST['account_id'] ?? 0), $_POST);
+            $_SESSION['flash_success'] = 'Credenciales guardadas de forma cifrada.';
+        } catch (Throwable $exception) {
+            $_SESSION['flash_error'] = 'No se pudieron guardar las credenciales: ' . $exception->getMessage();
+        }
+
+        $this->redirect('/integrations/accounts');
+    }
+
+    public function testAccountCredentials(): void
+    {
+        $this->requireAuth();
+
+        $result = (new OmnichannelRepository())->testCredentials($this->companyId(), (int) ($_POST['account_id'] ?? 0));
+        if ($result['ok']) {
+            $_SESSION['flash_success'] = 'Conexion probada: ' . $result['message'];
+        } else {
+            $_SESSION['flash_error'] = 'No se pudo conectar: ' . $result['message'];
+        }
+
+        $this->redirect('/integrations/accounts');
+    }
 }

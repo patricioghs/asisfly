@@ -1,9 +1,9 @@
 <?php
-$providerLabels = ['whatsapp_cloud' => 'WhatsApp Business', 'gmail' => 'Gmail', 'outlook' => 'Outlook', 'imap' => 'Correo corporativo', 'meta' => 'Meta', 'telegram' => 'Telegram'];
-$channelLabels = ['WhatsApp' => 'WhatsApp', 'Email' => 'Email', 'Instagram' => 'Instagram', 'Messenger' => 'Messenger', 'Telegram' => 'Telegram'];
+$providerLabels = ['whatsapp_cloud' => 'WhatsApp Business', 'gmail' => 'Gmail', 'outlook' => 'Outlook', 'imap' => 'Correo IMAP/SMTP', 'meta' => 'Meta', 'telegram' => 'Telegram', 'obraok' => 'ObraOK'];
+$channelLabels = ['WhatsApp' => 'WhatsApp', 'Email' => 'Email', 'Instagram' => 'Instagram', 'Messenger' => 'Messenger', 'Telegram' => 'Telegram', 'Operaciones' => 'Operaciones'];
 $statusLabels = ['simulated' => 'Demo', 'sandbox' => 'Prueba', 'connected' => 'Conectada', 'disabled' => 'Pausada', 'error' => 'Error'];
 $brainLabels = ['commercial' => 'Comercial', 'administrative' => 'Administrativo', 'analytical' => 'Analitico', 'operational' => 'Operacional', 'executive' => 'Ejecutivo'];
-$channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Instagram' => 'bi-instagram', 'Messenger' => 'bi-messenger', 'Telegram' => 'bi-telegram'];
+$channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Instagram' => 'bi-instagram', 'Messenger' => 'bi-messenger', 'Telegram' => 'bi-telegram', 'Operaciones' => 'bi-kanban'];
 ?>
 
 <section class="panel launch-hero">
@@ -53,7 +53,7 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
             </label>
             <label>
                 <span>Identificador</span>
-                <input class="form-control" name="external_account_id" placeholder="Numero, email, usuario o cuenta">
+                <input class="form-control" name="external_account_id" placeholder="Email, numero, usuario o ID de cuenta">
             </label>
             <label>
                 <span>Cerebro asignado</span>
@@ -126,11 +126,83 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
                         <label><input type="checkbox" name="requires_approval" value="1" <?= !empty($account['requires_approval']) ? 'checked' : '' ?>><span>Aprobar</span></label>
                     </div>
                     <div class="account-token">
-                        <span>Webhook</span>
-                        <code><?= e($account['webhook_token']) ?></code>
+                        <span>Credenciales</span>
+                        <code><?= !empty($account['credentials_updated_at']) ? 'Cifradas: ' . e((string) ($account['credentials_last4'] ?? 'configuradas')) : 'Sin credenciales' ?></code>
                     </div>
                     <button class="btn btn-outline-primary w-100">Guardar cambios</button>
                 </form>
+
+                <?php if (in_array($account['provider'], ['imap', 'gmail', 'outlook'], true)): ?>
+                    <form class="account-card-form mt-3" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
+                        <input type="hidden" name="email_address" value="<?= e($account['external_account_id'] ?? '') ?>">
+                        <div class="account-form-row">
+                            <label>
+                                <span>IMAP host</span>
+                                <input class="form-control" name="imap_host" placeholder="imap.empresa.com">
+                            </label>
+                            <label>
+                                <span>Puerto</span>
+                                <select class="form-select" name="imap_port">
+                                    <option value="993">993 SSL</option>
+                                    <option value="143">143 TLS/None</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="account-form-row">
+                            <label>
+                                <span>SMTP host</span>
+                                <input class="form-control" name="smtp_host" placeholder="smtp.empresa.com">
+                            </label>
+                            <label>
+                                <span>Puerto</span>
+                                <select class="form-select" name="smtp_port">
+                                    <option value="587">587 TLS</option>
+                                    <option value="465">465 SSL</option>
+                                    <option value="25">25</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="account-form-row">
+                            <label>
+                                <span>Usuario</span>
+                                <input class="form-control" name="username" placeholder="correo@empresa.com">
+                            </label>
+                            <label>
+                                <span>Clave</span>
+                                <input class="form-control" type="password" name="password" placeholder="Clave o app password" autocomplete="new-password">
+                            </label>
+                        </div>
+                        <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar credenciales correo</button>
+                    </form>
+                <?php elseif ($account['provider'] === 'obraok'): ?>
+                    <form class="account-card-form mt-3" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
+                        <label>
+                            <span>URL API</span>
+                            <input class="form-control" name="api_base_url" placeholder="https://api.obraok.cl">
+                        </label>
+                        <label>
+                            <span>Token API</span>
+                            <input class="form-control" type="password" name="api_token" placeholder="Token o API key" autocomplete="new-password">
+                        </label>
+                        <label>
+                            <span>Workspace / empresa</span>
+                            <input class="form-control" name="workspace_id" placeholder="ID de cuenta o proyecto">
+                        </label>
+                        <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar credenciales ObraOK</button>
+                    </form>
+                <?php endif; ?>
+
+                <?php if (!empty($account['credentials_updated_at'])): ?>
+                    <form class="mt-2" method="post" action="<?= url('/integrations/accounts/test') ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
+                        <button class="btn btn-primary w-100"><i class="bi bi-wifi"></i> Probar conexion</button>
+                    </form>
+                <?php endif; ?>
             </article>
         <?php endforeach; ?>
     </section>

@@ -106,6 +106,8 @@ $router->post('/integrations/ai/test', [IntegrationController::class, 'testAi'])
 $router->get('/integrations/accounts', [IntegrationController::class, 'accounts']);
 $router->post('/integrations/accounts', [IntegrationController::class, 'saveAccount']);
 $router->post('/integrations/accounts/update', [IntegrationController::class, 'updateAccount']);
+$router->post('/integrations/accounts/credentials', [IntegrationController::class, 'saveAccountCredentials']);
+$router->post('/integrations/accounts/test', [IntegrationController::class, 'testAccountCredentials']);
 $router->get('/apis', [ApiController::class, 'index']);
 $router->get('/company', [CompanyController::class, 'profile']);
 $router->get('/users', [CompanyController::class, 'users']);

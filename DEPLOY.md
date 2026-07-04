@@ -167,6 +167,7 @@ sudo certbot --nginx -d staging-asisfly.tilo.cl
 cd /var/www/html/staging-asisfly
 git pull origin Staging
 php database/upgrade_superadmin_api_keys.php
+php database/upgrade_omnichannel_credentials.php
 sudo chown -R www-data:www-data storage logs
 ```
 

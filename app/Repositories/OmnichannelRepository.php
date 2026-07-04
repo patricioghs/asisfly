@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Core\Database;
+use App\Services\ConnectionTester;
+use App\Services\SecretVault;
 use PDO;
 
 final class OmnichannelRepository
@@ -107,6 +109,60 @@ final class OmnichannelRepository
         ]);
     }
 
+    public function saveCredentials(int $companyId, int $accountId, array $input): void
+    {
+        $account = $this->account($companyId, $accountId);
+        if (!$account) {
+            return;
+        }
+
+        $credentials = $this->credentialsFromInput($account, $input);
+        $vault = new SecretVault();
+        $encrypted = $vault->encrypt(json_encode($credentials, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+
+        $settings = $this->settings($account);
+        $settings['credential_type'] = $credentials['type'];
+        $settings['configured_at'] = date('c');
+
+        Database::connection()->prepare('UPDATE omnichannel_accounts
+            SET encrypted_credentials = :encrypted_credentials,
+                credentials_last4 = :credentials_last4,
+                credentials_updated_at = CURRENT_TIMESTAMP,
+                settings_json = :settings_json,
+                status = "sandbox",
+                updated_at = CURRENT_TIMESTAMP
+            WHERE company_id = :company_id AND id = :id')->execute([
+            'encrypted_credentials' => $encrypted,
+            'credentials_last4' => $this->credentialLabel($credentials),
+            'settings_json' => json_encode($settings, JSON_UNESCAPED_UNICODE),
+            'company_id' => $companyId,
+            'id' => $accountId,
+        ]);
+    }
+
+    public function testCredentials(int $companyId, int $accountId): array
+    {
+        $account = $this->account($companyId, $accountId);
+        if (!$account) {
+            return ['ok' => false, 'message' => 'Cuenta no encontrada.'];
+        }
+
+        $credentials = $this->decryptCredentials($account);
+        if (!$credentials) {
+            return ['ok' => false, 'message' => 'Primero guarda las credenciales de esta cuenta.'];
+        }
+
+        $result = (new ConnectionTester())->test($credentials);
+        Database::connection()->prepare('UPDATE omnichannel_accounts SET status = :status, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')
+            ->execute([
+                'status' => $result['ok'] ? 'connected' : 'error',
+                'company_id' => $companyId,
+                'id' => $accountId,
+            ]);
+
+        return $result;
+    }
+
     public function receiveWebhook(string $token, array $payload): array
     {
         if (!$this->databaseReady()) {
@@ -174,6 +230,70 @@ final class OmnichannelRepository
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    private function account(int $companyId, int $accountId): ?array
+    {
+        if (!$this->databaseReady() || $accountId <= 0) {
+            return null;
+        }
+
+        $statement = Database::connection()->prepare('SELECT * FROM omnichannel_accounts WHERE company_id = :company_id AND id = :id LIMIT 1');
+        $statement->execute(['company_id' => $companyId, 'id' => $accountId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    private function decryptCredentials(array $account): ?array
+    {
+        $json = (new SecretVault())->decrypt($account['encrypted_credentials'] ?? null);
+        if (!$json) {
+            return null;
+        }
+
+        $decoded = json_decode($json, true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function credentialsFromInput(array $account, array $input): array
+    {
+        if (($account['provider'] ?? '') === 'obraok') {
+            return [
+                'type' => 'obraok_api',
+                'api_base_url' => trim((string) ($input['api_base_url'] ?? '')),
+                'api_token' => trim((string) ($input['api_token'] ?? '')),
+                'workspace_id' => trim((string) ($input['workspace_id'] ?? '')),
+            ];
+        }
+
+        return [
+            'type' => 'email_imap_smtp',
+            'email_address' => trim((string) ($input['email_address'] ?? $account['external_account_id'] ?? '')),
+            'username' => trim((string) ($input['username'] ?? '')),
+            'password' => (string) ($input['password'] ?? ''),
+            'imap_host' => trim((string) ($input['imap_host'] ?? '')),
+            'imap_port' => (int) ($input['imap_port'] ?? 993),
+            'imap_encryption' => $this->encryption((string) ($input['imap_encryption'] ?? 'ssl')),
+            'smtp_host' => trim((string) ($input['smtp_host'] ?? '')),
+            'smtp_port' => (int) ($input['smtp_port'] ?? 587),
+            'smtp_encryption' => $this->encryption((string) ($input['smtp_encryption'] ?? 'tls')),
+        ];
+    }
+
+    private function credentialLabel(array $credentials): string
+    {
+        if (($credentials['type'] ?? '') === 'obraok_api') {
+            $token = (string) ($credentials['api_token'] ?? '');
+            return $token !== '' ? 'token ****' . substr($token, -4) : 'api';
+        }
+
+        return (string) ($credentials['email_address'] ?? $credentials['username'] ?? 'email');
+    }
+
+    private function settings(array $account): array
+    {
+        $decoded = json_decode((string) ($account['settings_json'] ?? ''), true);
+        return is_array($decoded) ? $decoded : [];
     }
 
     private function accountByToken(string $token): ?array
@@ -330,12 +450,12 @@ final class OmnichannelRepository
 
     private function provider(string $provider): string
     {
-        return in_array($provider, ['whatsapp_cloud', 'gmail', 'outlook', 'imap', 'meta', 'telegram'], true) ? $provider : 'imap';
+        return in_array($provider, ['whatsapp_cloud', 'gmail', 'outlook', 'imap', 'meta', 'telegram', 'obraok'], true) ? $provider : 'imap';
     }
 
     private function channel(string $channel): string
     {
-        return in_array($channel, ['WhatsApp', 'Email', 'Instagram', 'Messenger', 'Telegram'], true) ? $channel : 'Email';
+        return in_array($channel, ['WhatsApp', 'Email', 'Instagram', 'Messenger', 'Telegram', 'Operaciones'], true) ? $channel : 'Email';
     }
 
     private function status(string $status): string
@@ -351,5 +471,10 @@ final class OmnichannelRepository
     private function webhookToken(int $companyId, string $provider): string
     {
         return 'acct-' . $companyId . '-' . $provider . '-' . bin2hex(random_bytes(8));
+    }
+
+    private function encryption(string $value): string
+    {
+        return in_array($value, ['ssl', 'tls', 'none'], true) ? $value : 'tls';
     }
 }
