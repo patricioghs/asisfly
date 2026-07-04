@@ -102,6 +102,7 @@ $router->post('/social/generate', [SocialController::class, 'generate']);
 $router->post('/social/status', [SocialController::class, 'status']);
 $router->get('/integrations', [IntegrationController::class, 'index']);
 $router->post('/integrations/ai', [IntegrationController::class, 'saveAi']);
+$router->post('/integrations/ai/test', [IntegrationController::class, 'testAi']);
 $router->get('/integrations/accounts', [IntegrationController::class, 'accounts']);
 $router->post('/integrations/accounts', [IntegrationController::class, 'saveAccount']);
 $router->post('/integrations/accounts/update', [IntegrationController::class, 'updateAccount']);

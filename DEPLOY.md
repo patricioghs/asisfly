@@ -89,6 +89,32 @@ php database/prepare_real_workspace.php \
 
 Este comando elimina datos demo/transaccionales, conserva planes y roles, crea la empresa real inicial, crea el usuario superadmin y deja integraciones en modo simulado/sandbox.
 
+## OpenAI real
+
+Configurar la API key en el `.env` del VPS:
+
+```bash
+cd /var/www/html/staging-asisfly
+nano .env
+```
+
+Agregar o actualizar:
+
+```env
+AI_DEFAULT_PROVIDER=simulated
+OPENAI_API_KEY=sk-proj_REEMPLAZAR
+OPENAI_DEFAULT_MODEL=gpt-4.1-mini
+```
+
+Luego entrar a `Integraciones`, seleccionar:
+
+- Proveedor principal: `OpenAI`
+- Modelo: `gpt-4.1-mini`
+- Variable API key: `OPENAI_API_KEY`
+- Motor IA activo: marcado
+
+Guardar y presionar `Probar OpenAI`. La prueba registra tokens, costo estimado, modelo, usuario y empresa en `ai_usage_logs`.
+
 ## Permisos
 
 ```bash

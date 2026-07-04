@@ -8,6 +8,7 @@
             <span>Costo mes: <strong>USD <?= e(number_format((float) ($aiSettings['monthly_cost_used'] ?? 0), 4)) ?></strong></span>
             <span>Estado: <strong><?= !empty($aiSettings['is_enabled']) ? 'Activo' : 'Pausado' ?></strong></span>
         </div>
+        <p class="text-secondary mt-3 mb-0">Para OpenAI real configura <code>OPENAI_API_KEY</code> en el <code>.env</code> del VPS, selecciona proveedor OpenAI y guarda.</p>
     </div>
     <form method="post" action="<?= url('/integrations/ai') ?>" class="ai-config-form">
         <?= csrf_field() ?>
@@ -56,6 +57,21 @@
             <span>Motor IA activo para esta empresa</span>
         </label>
         <button class="btn btn-primary">Guardar motor IA</button>
+    </form>
+</section>
+
+<section class="panel mt-3">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Validacion beta</span>
+            <h3>Probar conexion OpenAI</h3>
+        </div>
+        <span class="status-pill"><i class="bi bi-cpu"></i><?= e($aiSettings['provider'] ?? 'simulated') ?> / <?= e($aiSettings['model'] ?? '-') ?></span>
+    </div>
+    <p class="text-secondary mb-3">Ejecuta una llamada real corta, registra tokens y costo estimado en el consumo IA de esta empresa.</p>
+    <form method="post" action="<?= url('/integrations/ai/test') ?>">
+        <?= csrf_field() ?>
+        <button class="btn btn-outline-primary"><i class="bi bi-lightning-charge"></i> Probar OpenAI</button>
     </form>
 </section>
 
