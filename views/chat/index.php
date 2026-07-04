@@ -1,5 +1,5 @@
 <div class="chat-layout">
-    <div class="panel chat-window">
+    <div class="panel chat-window" id="chatWindow" data-chat-window>
         <div class="chat-autonomy-card">
             <div>
                 <span class="eyebrow">Modo de IA</span>
@@ -34,10 +34,12 @@
                 <p><?= e($message['content']) ?></p>
             </div>
         <?php endforeach; ?>
+        <div id="chatBottom" data-chat-bottom></div>
     </div>
-    <form class="composer" method="post" action="<?= url('/chat') ?>">
+    <form class="composer" method="post" action="<?= url('/chat') ?>" data-chat-form>
         <?= csrf_field() ?>
-        <textarea class="form-control" name="prompt" rows="3" placeholder="Escribe una tarea para tu empleado digital..." required></textarea>
-        <button class="btn btn-primary">Enviar</button>
+        <input type="hidden" name="chat_nonce" value="<?= e((string) ($chatNonce ?? '')) ?>">
+        <textarea class="form-control" name="prompt" rows="3" placeholder="Escribe una tarea para tu empleado digital..." required data-chat-prompt></textarea>
+        <button class="btn btn-primary" type="submit" data-chat-submit>Enviar</button>
     </form>
 </div>

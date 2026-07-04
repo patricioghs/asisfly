@@ -14,16 +14,25 @@ final class ChatController extends Controller
     public function index(): void
     {
         $this->requirePermission('chat.use');
+        $_SESSION['chat_nonce'] = bin2hex(random_bytes(16));
         $this->view('chat/index', [
             'title' => 'Chat IA',
             'messages' => $_SESSION['chat'] ?? [],
             'autonomy' => (new AutonomyRepository())->profile($this->companyId()),
+            'chatNonce' => $_SESSION['chat_nonce'],
         ]);
     }
 
     public function ask(): void
     {
         $this->requirePermission('chat.use');
+        $nonce = (string) ($_POST['chat_nonce'] ?? '');
+        if ($nonce === '' || !hash_equals((string) ($_SESSION['chat_nonce'] ?? ''), $nonce)) {
+            $_SESSION['flash_error'] = 'La solicitud ya fue enviada o expiro. Escribe el mensaje nuevamente si necesitas repetirla.';
+            $this->redirect('/chat');
+        }
+        unset($_SESSION['chat_nonce']);
+
         $prompt = trim($_POST['prompt'] ?? '');
         if (strlen($prompt) > 4000) {
             $_SESSION['chat'][] = ['role' => 'assistant', 'content' => 'La solicitud es demasiado larga para esta fase. Resume la tarea y vuelve a intentarlo.'];

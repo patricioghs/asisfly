@@ -51,3 +51,39 @@ document.addEventListener('keydown', (event) => {
     closeSidebar();
   }
 });
+
+const chatWindow = document.querySelector('[data-chat-window]');
+const chatBottom = document.querySelector('[data-chat-bottom]');
+const chatForm = document.querySelector('[data-chat-form]');
+const chatSubmit = document.querySelector('[data-chat-submit]');
+const chatPrompt = document.querySelector('[data-chat-prompt]');
+
+if (chatWindow) {
+  requestAnimationFrame(() => {
+    if (chatBottom) {
+      chatBottom.scrollIntoView({ block: 'end' });
+      return;
+    }
+
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  });
+}
+
+chatForm?.addEventListener('submit', (event) => {
+  if (chatForm.dataset.submitting === 'true') {
+    event.preventDefault();
+    return;
+  }
+
+  if (chatPrompt && chatPrompt.value.trim() === '') {
+    event.preventDefault();
+    chatPrompt.focus();
+    return;
+  }
+
+  chatForm.dataset.submitting = 'true';
+  if (chatSubmit) {
+    chatSubmit.disabled = true;
+    chatSubmit.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Enviando';
+  }
+});
