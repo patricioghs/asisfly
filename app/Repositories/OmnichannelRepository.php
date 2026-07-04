@@ -58,6 +58,10 @@ final class OmnichannelRepository
         if ($displayName === '') {
             $displayName = $channel . ' ' . ucfirst(str_replace('_', ' ', $provider));
         }
+        $externalAccountId = trim((string) ($input['external_account_id'] ?? ''));
+        $brainKey = !empty($input['brain_key'])
+            ? $this->brainKey((string) $input['brain_key'])
+            : $this->autoBrainKey($provider, $channel, $displayName, $externalAccountId);
 
         $statement = Database::connection()->prepare('INSERT INTO omnichannel_accounts (company_id, provider, channel, display_name, external_account_id, webhook_token, status, inbound_enabled, outbound_enabled, requires_approval, brain_key, assigned_user_id, settings_json)
             VALUES (:company_id, :provider, :channel, :display_name, :external_account_id, :webhook_token, :status, :inbound_enabled, :outbound_enabled, :requires_approval, :brain_key, :assigned_user_id, :settings_json)');
@@ -66,13 +70,13 @@ final class OmnichannelRepository
             'provider' => $provider,
             'channel' => $channel,
             'display_name' => $displayName,
-            'external_account_id' => trim((string) ($input['external_account_id'] ?? '')),
+            'external_account_id' => $externalAccountId,
             'webhook_token' => $this->webhookToken($companyId, $provider),
             'status' => $this->status((string) ($input['status'] ?? 'sandbox')),
             'inbound_enabled' => !empty($input['inbound_enabled']) ? 1 : 0,
             'outbound_enabled' => !empty($input['outbound_enabled']) ? 1 : 0,
             'requires_approval' => !empty($input['requires_approval']) ? 1 : 0,
-            'brain_key' => $this->brainKey((string) ($input['brain_key'] ?? 'commercial')),
+            'brain_key' => $brainKey,
             'assigned_user_id' => !empty($input['assigned_user_id']) ? (int) $input['assigned_user_id'] : null,
             'settings_json' => json_encode(['send_mode' => !empty($input['outbound_enabled']) ? 'outbound_enabled' : 'approval_required'], JSON_UNESCAPED_UNICODE),
         ]);
@@ -466,6 +470,38 @@ final class OmnichannelRepository
     private function brainKey(string $brain): string
     {
         return in_array($brain, ['commercial', 'administrative', 'analytical', 'operational', 'executive'], true) ? $brain : 'commercial';
+    }
+
+    private function autoBrainKey(string $provider, string $channel, string $displayName, string $externalAccountId): string
+    {
+        if ($provider === 'obraok' || $channel === 'Operaciones') {
+            return 'operational';
+        }
+
+        if (in_array($channel, ['WhatsApp', 'Instagram', 'Messenger', 'Telegram'], true)) {
+            return 'commercial';
+        }
+
+        $text = strtolower($displayName . ' ' . $externalAccountId);
+        foreach (['admin', 'contabilidad', 'finanza', 'factura', 'facturacion', 'pago', 'cobranza', 'rrhh', 'personal'] as $word) {
+            if (str_contains($text, $word)) {
+                return 'administrative';
+            }
+        }
+
+        foreach (['gerencia', 'gerente', 'direccion', 'director', 'ceo', 'fundador'] as $word) {
+            if (str_contains($text, $word)) {
+                return 'executive';
+            }
+        }
+
+        foreach (['analytics', 'analitica', 'reporte', 'reportes', 'datos', 'bi'] as $word) {
+            if (str_contains($text, $word)) {
+                return 'analytical';
+            }
+        }
+
+        return 'commercial';
     }
 
     private function webhookToken(int $companyId, string $provider): string

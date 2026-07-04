@@ -2,7 +2,7 @@
 $providerLabels = ['whatsapp_cloud' => 'WhatsApp Business', 'gmail' => 'Gmail', 'outlook' => 'Outlook', 'imap' => 'Correo IMAP/SMTP', 'meta' => 'Meta', 'telegram' => 'Telegram', 'obraok' => 'ObraOK'];
 $channelLabels = ['WhatsApp' => 'WhatsApp', 'Email' => 'Email', 'Instagram' => 'Instagram', 'Messenger' => 'Messenger', 'Telegram' => 'Telegram', 'Operaciones' => 'Operaciones'];
 $statusLabels = ['simulated' => 'Demo', 'sandbox' => 'Prueba', 'connected' => 'Conectada', 'disabled' => 'Pausada', 'error' => 'Error'];
-$brainLabels = ['commercial' => 'Comercial', 'administrative' => 'Administrativo', 'analytical' => 'Analitico', 'operational' => 'Operacional', 'executive' => 'Ejecutivo'];
+$brainLabels = ['commercial' => 'Ventas y clientes', 'administrative' => 'Administracion', 'analytical' => 'Analisis y reportes', 'operational' => 'Operaciones', 'executive' => 'Direccion'];
 $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Instagram' => 'bi-instagram', 'Messenger' => 'bi-messenger', 'Telegram' => 'bi-telegram', 'Operaciones' => 'bi-kanban'];
 ?>
 
@@ -55,12 +55,10 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
                 <span>Identificador</span>
                 <input class="form-control" name="external_account_id" placeholder="Email, numero, usuario o ID de cuenta">
             </label>
-            <label>
-                <span>Cerebro asignado</span>
-                <select class="form-select" name="brain_key">
-                    <?php foreach ($brainLabels as $value => $label): ?><option value="<?= e($value) ?>"><?= e($label) ?></option><?php endforeach; ?>
-                </select>
-            </label>
+            <div class="account-token">
+                <span>Uso automatico</span>
+                <code>AsisFly asigna esta cuenta segun canal, proveedor y nombre.</code>
+            </div>
             <label>
                 <span>Responsable</span>
                 <select class="form-select" name="assigned_user_id">
@@ -107,7 +105,7 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
                             </select>
                         </label>
                         <label>
-                            <span>Cerebro</span>
+                            <span>Uso principal</span>
                             <select class="form-select" name="brain_key">
                                 <?php foreach ($brainLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= ($account['brain_key'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
                             </select>

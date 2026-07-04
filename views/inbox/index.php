@@ -6,7 +6,7 @@ $priorityIcons = ['critical' => 'bi-exclamation-octagon', 'high' => 'bi-arrow-up
 $messageStatusOptions = ['received' => 'Recibido', 'draft' => 'Borrador', 'approved' => 'Aprobado', 'sent' => 'Enviado', 'failed' => 'Fallido'];
 $connectorStatusOptions = ['simulated' => 'Demo', 'sandbox' => 'Prueba', 'connected' => 'Conectado', 'disabled' => 'Pausado', 'error' => 'Error'];
 $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Instagram' => 'bi-instagram', 'Messenger' => 'bi-messenger', 'Email' => 'bi-envelope-at'];
-$brainLabels = ['commercial' => 'Comercial', 'administrative' => 'Administrativo', 'analytical' => 'Analitico', 'operational' => 'Operacional', 'executive' => 'Ejecutivo'];
+$brainLabels = ['commercial' => 'Ventas y clientes', 'administrative' => 'Administracion', 'analytical' => 'Analisis y reportes', 'operational' => 'Operaciones', 'executive' => 'Direccion'];
 $latestDraft = $selected['latest_draft'] ?? null;
 ?>
 <div class="inbox-hero panel">
