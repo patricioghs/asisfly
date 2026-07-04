@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Repositories\AiProviderRepository;
 use RuntimeException;
 
 final class OpenAiClient
 {
     public function respond(string $prompt, array $settings, array $context): array
     {
-        $apiKey = trim((string) env($settings['api_key_env'] ?? 'OPENAI_API_KEY', ''));
+        $apiKey = (new AiProviderRepository())->resolvedApiKey($settings);
         if ($apiKey === '') {
-            throw new RuntimeException('No hay API key configurada en la variable ' . ($settings['api_key_env'] ?? 'OPENAI_API_KEY') . '.');
+            throw new RuntimeException('No hay API key configurada para OpenAI. Guardala desde Superadmin > IA y tokens o define ' . ($settings['api_key_env'] ?? 'OPENAI_API_KEY') . ' en el .env.');
         }
 
         if (!function_exists('curl_init')) {

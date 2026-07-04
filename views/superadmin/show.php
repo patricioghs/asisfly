@@ -12,13 +12,13 @@
 </section>
 
 <section class="panel mt-4">
+    <?php if (!empty($_SESSION['flash_error'])): ?>
+        <div class="alert alert-danger"><?= e($_SESSION['flash_error']); unset($_SESSION['flash_error']); ?></div>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['flash_success'])): ?>
+        <div class="alert alert-success"><?= e($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></div>
+    <?php endif; ?>
     <?php if ($type === 'companies'): ?>
-        <?php if (!empty($_SESSION['flash_error'])): ?>
-            <div class="alert alert-danger"><?= e($_SESSION['flash_error']); unset($_SESSION['flash_error']); ?></div>
-        <?php endif; ?>
-        <?php if (!empty($_SESSION['flash_success'])): ?>
-            <div class="alert alert-success"><?= e($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></div>
-        <?php endif; ?>
         <div class="section-heading">
             <div>
                 <span class="eyebrow">Alta de cliente</span>
@@ -82,6 +82,73 @@
             </table>
         </div>
     <?php elseif ($type === 'usage'): ?>
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Credenciales administradas</span>
+                <h3>OpenAI desde Superadmin</h3>
+                <p class="text-secondary mb-0">Guarda la API key cifrada por empresa. La clave no se muestra nuevamente despues de guardarla.</p>
+            </div>
+            <span class="status-pill"><i class="bi bi-key"></i> Cifrado con APP_KEY</span>
+        </div>
+        <form method="post" action="<?= url('/admin/ai-tokens/openai-key') ?>" class="row g-3 mb-4">
+            <?= csrf_field() ?>
+            <div class="col-md-4">
+                <label class="form-label">Empresa</label>
+                <select class="form-select" name="company_id" required>
+                    <?php foreach (($credentials ?? []) as $credential): ?>
+                        <option value="<?= e((string) $credential['id']) ?>"><?= e($credential['name']) ?> · <?= e($credential['plan']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">API key OpenAI</label>
+                <input class="form-control" type="password" name="openai_api_key" placeholder="sk-proj-..." autocomplete="new-password" required>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100"><i class="bi bi-shield-lock"></i> Guardar</button>
+            </div>
+        </form>
+
+        <div class="table-responsive mb-4">
+            <table class="table align-middle">
+                <thead><tr><th>Empresa</th><th>Proveedor</th><th>Modelo</th><th>Clave</th><th>Actualizada</th><th></th></tr></thead>
+                <tbody>
+                    <?php foreach (($credentials ?? []) as $credential): ?>
+                        <tr>
+                            <td><strong><?= e($credential['name']) ?></strong><br><small class="text-secondary"><?= e($credential['plan']) ?></small></td>
+                            <td><?= e($credential['provider']) ?></td>
+                            <td><?= e($credential['model']) ?></td>
+                            <td>
+                                <?php if ($credential['source'] === 'Plataforma'): ?>
+                                    <span class="status-pill success"><i class="bi bi-check2-circle"></i> Plataforma · ****<?= e((string) $credential['last4']) ?></span>
+                                <?php elseif ($credential['source'] === '.env'): ?>
+                                    <span class="status-pill"><i class="bi bi-terminal"></i> .env</span>
+                                <?php else: ?>
+                                    <span class="status-pill warning"><i class="bi bi-exclamation-triangle"></i> Sin clave</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= e((string) ($credential['updated_at'] ?? '-')) ?></td>
+                            <td class="text-end">
+                                <?php if ($credential['source'] === 'Plataforma'): ?>
+                                    <form method="post" action="<?= url('/admin/ai-tokens/openai-key/delete') ?>">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="company_id" value="<?= e((string) $credential['id']) ?>">
+                                        <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Auditoria IA</span>
+                <h3>Consumo reciente</h3>
+            </div>
+        </div>
         <div class="table-responsive">
             <table class="table align-middle"><thead><tr><th>Proveedor</th><th>Modelo</th><th>Modulo</th><th>Tokens</th><th>Costo</th><th>Estado</th></tr></thead>
                 <tbody><?php foreach ($cards as $row): ?><tr><td><?= e($row['provider'] ?? '-') ?></td><td><?= e($row['model'] ?? '-') ?></td><td><?= e($row['module'] ?? '-') ?></td><td><?= e((string) ($row['tokens'] ?? 0)) ?></td><td><?= e($row['cost'] ?? '-') ?></td><td><?= e($row['status'] ?? '-') ?></td></tr><?php endforeach; ?></tbody>

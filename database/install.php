@@ -43,6 +43,7 @@ foreach ([
     __DIR__ . '/migrations/016_multi_account_omnichannel_schema.sql',
     __DIR__ . '/migrations/017_task_collaboration_schema.sql',
     __DIR__ . '/migrations/018_controls_schema.sql',
+    __DIR__ . '/migrations/019_superadmin_api_keys_schema.sql',
     __DIR__ . '/seeders/002_demo_data.sql',
     __DIR__ . '/seeders/003_brains_data.sql',
     __DIR__ . '/seeders/004_social_data.sql',

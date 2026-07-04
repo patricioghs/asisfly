@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Core\Database;
+use App\Services\SecretVault;
 use PDO;
+use Throwable;
 
 final class AiProviderRepository
 {
@@ -17,6 +19,11 @@ final class AiProviderRepository
             'fallback_provider' => 'simulated',
             'fallback_model' => 'asisfly-demo-latam',
             'api_key_env' => 'OPENAI_API_KEY',
+            'encrypted_api_key' => null,
+            'api_key_last4' => null,
+            'api_key_updated_at' => null,
+            'has_managed_api_key' => false,
+            'api_key_source' => trim((string) env('OPENAI_API_KEY', '')) !== '' ? 'env' : 'missing',
             'temperature' => 0.4,
             'monthly_token_limit' => 500000,
             'monthly_cost_limit' => 25.0,
@@ -42,6 +49,11 @@ final class AiProviderRepository
             'fallback_provider' => $row['fallback_provider'],
             'fallback_model' => $row['fallback_model'],
             'api_key_env' => $row['api_key_env'] ?: 'OPENAI_API_KEY',
+            'encrypted_api_key' => $row['encrypted_api_key'] ?? null,
+            'api_key_last4' => $row['api_key_last4'] ?? null,
+            'api_key_updated_at' => $row['api_key_updated_at'] ?? null,
+            'has_managed_api_key' => !empty($row['encrypted_api_key']),
+            'api_key_source' => !empty($row['encrypted_api_key']) ? 'managed' : (trim((string) env($row['api_key_env'] ?: 'OPENAI_API_KEY', '')) !== '' ? 'env' : 'missing'),
             'temperature' => (float) $row['temperature'],
             'monthly_token_limit' => (int) $row['monthly_token_limit'],
             'monthly_cost_limit' => (float) $row['monthly_cost_limit'],
@@ -79,6 +91,86 @@ final class AiProviderRepository
             ...$settings,
             'is_enabled' => $settings['is_enabled'] ? 1 : 0,
         ]);
+    }
+
+    public function saveManagedApiKey(int $companyId, string $apiKey): void
+    {
+        if (!Database::available()) {
+            return;
+        }
+
+        $vault = new SecretVault();
+        $encrypted = $vault->encrypt($apiKey);
+
+        $sql = "INSERT INTO ai_provider_settings
+                (company_id, provider, model, fallback_provider, fallback_model, api_key_env, encrypted_api_key, api_key_last4, api_key_updated_at, temperature, monthly_token_limit, monthly_cost_limit, is_enabled)
+                VALUES (:company_id, 'openai', :model, 'simulated', 'asisfly-demo-latam', 'OPENAI_API_KEY', :encrypted_api_key, :api_key_last4, CURRENT_TIMESTAMP, 0.40, 500000, 25.00, 1)
+                ON DUPLICATE KEY UPDATE encrypted_api_key = VALUES(encrypted_api_key), api_key_last4 = VALUES(api_key_last4), api_key_updated_at = CURRENT_TIMESTAMP";
+
+        Database::connection()->prepare($sql)->execute([
+            'company_id' => $companyId,
+            'model' => env('OPENAI_DEFAULT_MODEL', 'gpt-4.1-mini'),
+            'encrypted_api_key' => $encrypted,
+            'api_key_last4' => $vault->last4($apiKey),
+        ]);
+    }
+
+    public function companyCredentialStatus(): array
+    {
+        if (!Database::available()) {
+            return [];
+        }
+
+        try {
+            $sql = "SELECT c.id, c.name, COALESCE(p.name, '-') AS plan, s.provider, s.model, s.api_key_last4, s.api_key_updated_at, s.encrypted_api_key
+                    FROM companies c
+                    LEFT JOIN plans p ON p.id = c.plan_id
+                    LEFT JOIN ai_provider_settings s ON s.company_id = c.id
+                    ORDER BY c.name";
+            $rows = Database::connection()->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable) {
+            $sql = "SELECT c.id, c.name, COALESCE(p.name, '-') AS plan, s.provider, s.model
+                    FROM companies c
+                    LEFT JOIN plans p ON p.id = c.plan_id
+                    LEFT JOIN ai_provider_settings s ON s.company_id = c.id
+                    ORDER BY c.name";
+            $rows = Database::connection()->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        return array_map(function (array $row): array {
+            $envKey = trim((string) env('OPENAI_API_KEY', ''));
+            return [
+                'id' => (int) $row['id'],
+                'name' => $row['name'],
+                'plan' => $row['plan'] ?? '-',
+                'provider' => $row['provider'] ?: 'simulated',
+                'model' => $row['model'] ?: env('OPENAI_DEFAULT_MODEL', 'gpt-4.1-mini'),
+                'source' => !empty($row['encrypted_api_key']) ? 'Plataforma' : ($envKey !== '' ? '.env' : 'Sin clave'),
+                'last4' => $row['api_key_last4'] ?? null,
+                'updated_at' => $row['api_key_updated_at'] ?? null,
+            ];
+        }, $rows);
+    }
+
+    public function forgetManagedApiKey(int $companyId): void
+    {
+        if (!Database::available()) {
+            return;
+        }
+
+        Database::connection()
+            ->prepare('UPDATE ai_provider_settings SET encrypted_api_key = NULL, api_key_last4 = NULL, api_key_updated_at = NULL WHERE company_id = :company_id')
+            ->execute(['company_id' => $companyId]);
+    }
+
+    public function resolvedApiKey(array $settings): string
+    {
+        $managed = (new SecretVault())->decrypt($settings['encrypted_api_key'] ?? null);
+        if ($managed) {
+            return $managed;
+        }
+
+        return trim((string) env($settings['api_key_env'] ?? 'OPENAI_API_KEY', ''));
     }
 
     public function planLimits(int $companyId): array

@@ -89,28 +89,38 @@ php database/prepare_real_workspace.php \
 
 Este comando elimina datos demo/transaccionales, conserva planes y roles, crea la empresa real inicial, crea el usuario superadmin y deja integraciones en modo simulado/sandbox.
 
-## OpenAI real
+## OpenAI real administrado desde Superadmin
 
-Configurar la API key en el `.env` del VPS:
+La API key de OpenAI se puede guardar cifrada desde la plataforma. El `.env` queda como respaldo tecnico, no como flujo principal.
+
+Primero asegúrate de tener un `APP_KEY` real y estable en el `.env`:
 
 ```bash
 cd /var/www/html/staging-asisfly
 nano .env
 ```
 
-Agregar o actualizar:
+Ejemplo:
 
 ```env
 AI_DEFAULT_PROVIDER=simulated
-OPENAI_API_KEY=sk-proj_REEMPLAZAR
 OPENAI_DEFAULT_MODEL=gpt-4.1-mini
+APP_KEY=valor_largo_secreto_y_estable
 ```
 
-Luego entrar a `Integraciones`, seleccionar:
+Despues de actualizar codigo, ejecutar una vez:
+
+```bash
+php database/upgrade_superadmin_api_keys.php
+```
+
+Luego entrar como Superadmin a `Administracion > IA y tokens` y guardar la API key de OpenAI para la empresa correspondiente. La clave queda cifrada y solo se muestra su estado y ultimos 4 caracteres.
+
+Finalmente entrar a `Integraciones`, seleccionar:
 
 - Proveedor principal: `OpenAI`
 - Modelo: `gpt-4.1-mini`
-- Variable API key: `OPENAI_API_KEY`
+- Variable API key de respaldo: `OPENAI_API_KEY`
 - Motor IA activo: marcado
 
 Guardar y presionar `Probar OpenAI`. La prueba registra tokens, costo estimado, modelo, usuario y empresa en `ai_usage_logs`.
@@ -154,7 +164,7 @@ sudo certbot --nginx -d staging-asisfly.tilo.cl
 ```bash
 cd /var/www/html/staging-asisfly
 git pull origin Staging
-php database/install.php
+php database/upgrade_superadmin_api_keys.php
 sudo chown -R www-data:www-data storage logs
 ```
 

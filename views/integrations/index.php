@@ -8,7 +8,7 @@
             <span>Costo mes: <strong>USD <?= e(number_format((float) ($aiSettings['monthly_cost_used'] ?? 0), 4)) ?></strong></span>
             <span>Estado: <strong><?= !empty($aiSettings['is_enabled']) ? 'Activo' : 'Pausado' ?></strong></span>
         </div>
-        <p class="text-secondary mt-3 mb-0">Para OpenAI real configura <code>OPENAI_API_KEY</code> en el <code>.env</code> del VPS, selecciona proveedor OpenAI y guarda.</p>
+        <p class="text-secondary mt-3 mb-0">Para OpenAI real, el Superadmin debe cargar la API key cifrada en <strong>Administracion &gt; IA y tokens</strong>. El <code>.env</code> queda solo como respaldo tecnico.</p>
     </div>
     <form method="post" action="<?= url('/integrations/ai') ?>" class="ai-config-form">
         <?= csrf_field() ?>
@@ -25,8 +25,9 @@
             <input class="form-control" name="model" value="<?= e($aiSettings['model'] ?? 'gpt-4.1-mini') ?>">
         </label>
         <label>
-            <span>Variable API key</span>
+            <span>Variable API key de respaldo</span>
             <input class="form-control" name="api_key_env" value="<?= e($aiSettings['api_key_env'] ?? 'OPENAI_API_KEY') ?>">
+            <small class="text-secondary">Fuente actual: <?= e((string) ($aiSettings['api_key_source'] ?? 'missing')) ?><?= !empty($aiSettings['api_key_last4']) ? ' · ****' . e((string) $aiSettings['api_key_last4']) : '' ?></small>
         </label>
         <label>
             <span>Temperatura</span>
