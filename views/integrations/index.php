@@ -37,7 +37,36 @@ $currentTemperature = number_format((float) ($aiSettings['temperature'] ?? 0.4),
 $currentTokenLimit = (string) ($aiSettings['monthly_token_limit'] ?? 500000);
 $currentCostLimit = (string) (float) ($aiSettings['monthly_cost_limit'] ?? 25);
 $keySourceLabels = ['managed' => 'Clave propia de empresa', 'global' => 'Clave global de plataforma', 'env' => 'Respaldo tecnico .env', 'missing' => 'Sin clave'];
+$canManageAiEngine = !empty($canManageAiEngine);
 ?>
+<?php if (!$canManageAiEngine): ?>
+<section class="panel launch-hero">
+    <div>
+        <span class="eyebrow">IA empresarial</span>
+        <h2>AsisFly IA esta <?= !empty($aiSettings['is_enabled']) ? 'activa' : 'pausada' ?></h2>
+        <p>Tu empresa usa el motor IA administrado por AsisFly. Aqui puedes revisar consumo y conectar tus canales de trabajo.</p>
+    </div>
+    <a class="btn btn-primary" href="<?= url('/chat') ?>"><i class="bi bi-stars"></i> Usar Chat IA</a>
+</section>
+
+<section class="crm-metrics mt-4">
+    <article class="metric-card">
+        <span>Tokens usados</span>
+        <strong><?= e(number_format((int) ($aiSettings['monthly_tokens_used'] ?? 0))) ?></strong>
+        <small>Consumo del mes</small>
+    </article>
+    <article class="metric-card">
+        <span>Costo estimado</span>
+        <strong>USD <?= e(number_format((float) ($aiSettings['monthly_cost_used'] ?? 0), 4)) ?></strong>
+        <small>Auditado por empresa</small>
+    </article>
+    <article class="metric-card">
+        <span>Modelo</span>
+        <strong><?= e((string) ($aiSettings['model'] ?? 'AsisFly IA')) ?></strong>
+        <small><?= e($keySourceLabels[$aiSettings['api_key_source'] ?? 'missing'] ?? 'Administrado por AsisFly') ?></small>
+    </article>
+</section>
+<?php else: ?>
 <section class="panel ai-config">
     <div>
         <span class="eyebrow">Motor IA</span>
@@ -141,6 +170,7 @@ $keySourceLabels = ['managed' => 'Clave propia de empresa', 'global' => 'Clave g
         <button class="btn btn-outline-primary"><i class="bi bi-lightning-charge"></i> Probar OpenAI</button>
     </form>
 </section>
+<?php endif; ?>
 
 <div class="row g-3 mt-3">
     <?php foreach ($integrations as $integration): ?>

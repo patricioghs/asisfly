@@ -20,12 +20,18 @@ final class IntegrationController extends Controller
             'title' => 'Integraciones',
             'integrations' => (new TenantRepository())->integrations($this->companyId()),
             'aiSettings' => (new AiProviderRepository())->settings($this->companyId()),
+            'canManageAiEngine' => in_array('*', $_SESSION['user']['permissions'] ?? [], true),
         ]);
     }
 
     public function saveAi(): void
     {
         $this->requireAuth();
+        if (!in_array('*', $_SESSION['user']['permissions'] ?? [], true)) {
+            $_SESSION['flash_error'] = 'La configuracion tecnica del motor IA es administrada por AsisFly.';
+            $this->redirect('/integrations');
+        }
+
         (new AiProviderRepository())->save($this->companyId(), $_POST);
         $_SESSION['flash_success'] = 'Configuracion IA guardada.';
         $this->redirect('/integrations');
@@ -34,6 +40,10 @@ final class IntegrationController extends Controller
     public function testAi(): void
     {
         $this->requireAuth();
+        if (!in_array('*', $_SESSION['user']['permissions'] ?? [], true)) {
+            $_SESSION['flash_error'] = 'La prueba tecnica de OpenAI esta reservada para Superadmin.';
+            $this->redirect('/integrations');
+        }
 
         $repo = new AiProviderRepository();
         $settings = $repo->settings($this->companyId());
