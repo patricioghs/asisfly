@@ -9,10 +9,14 @@ if (!is_dir($sessionPath)) {
 
 session_save_path($sessionPath);
 session_name('asisfly_session');
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+    || (($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on');
+
 session_set_cookie_params([
     'lifetime' => 0,
     'path' => '/',
-    'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+    'secure' => $isHttps,
     'httponly' => true,
     'samesite' => 'Lax',
 ]);

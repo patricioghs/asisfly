@@ -33,7 +33,10 @@ final class Router
 
         if ($method === 'POST' && !$this->isCsrfExempt($path) && !Csrf::validate($_POST['_csrf'] ?? null)) {
             http_response_code(419);
-            echo 'Sesion expirada o formulario invalido.';
+            $_SESSION['flash_error'] = 'Sesion expirada o formulario invalido. Intenta nuevamente.';
+            $fallback = $_SERVER['HTTP_REFERER'] ?? '/login';
+            $target = parse_url($fallback, PHP_URL_PATH) ?: '/login';
+            header('Location: ' . $target);
             return;
         }
 

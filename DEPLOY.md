@@ -76,6 +76,15 @@ sudo find /var/www/html/staging-asisfly/storage /var/www/html/staging-asisfly/lo
 sudo find /var/www/html/staging-asisfly/storage /var/www/html/staging-asisfly/logs -type f -exec chmod 664 {} \;
 ```
 
+Si el login muestra `Sesion expirada o formulario invalido`, revisar primero que PHP pueda escribir sesiones:
+
+```bash
+cd /var/www/html/staging-asisfly
+sudo mkdir -p storage/sessions storage/uploads storage/quotes logs
+sudo chown -R www-data:www-data storage logs
+sudo chmod -R 775 storage logs
+```
+
 ## Nginx
 
 Copiar configuracion:
