@@ -37,7 +37,7 @@ final class CompanyController extends Controller
         $rows = [];
         $roles = [];
         if (Database::available()) {
-            $statement = Database::connection()->prepare('SELECT u.name, u.email, u.status, u.created_at, r.name AS role_name FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE u.company_id = :company_id ORDER BY u.id DESC LIMIT 50');
+            $statement = Database::connection()->prepare('SELECT u.id, u.name, u.email, u.status, u.created_at, r.name AS role_name FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE u.company_id = :company_id ORDER BY u.id DESC LIMIT 50');
             $statement->execute(['company_id' => $this->companyId()]);
             $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
             $roles = Database::connection()->query("SELECT id, name FROM roles WHERE name <> 'Superadmin' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
@@ -78,6 +78,33 @@ final class CompanyController extends Controller
             $_SESSION['flash_error'] = 'No se pudo crear el usuario. Revisa si el correo ya existe.';
         }
 
+        $this->redirect('/users');
+    }
+
+    public function deleteUser(): void
+    {
+        $this->requirePermission('users.manage');
+
+        $userId = (int) ($_POST['user_id'] ?? 0);
+        if ($userId <= 0) {
+            $_SESSION['flash_error'] = 'Usuario no valido.';
+            $this->redirect('/users');
+        }
+
+        if ($userId === (int) ($_SESSION['user']['id'] ?? 0)) {
+            $_SESSION['flash_error'] = 'No puedes eliminar tu propio acceso desde esta pantalla.';
+            $this->redirect('/users');
+        }
+
+        if (Database::available()) {
+            $statement = Database::connection()->prepare("UPDATE users SET status = 'disabled' WHERE id = :id AND company_id = :company_id");
+            $statement->execute([
+                'id' => $userId,
+                'company_id' => $this->companyId(),
+            ]);
+        }
+
+        $_SESSION['flash_success'] = 'Acceso de usuario eliminado.';
         $this->redirect('/users');
     }
 

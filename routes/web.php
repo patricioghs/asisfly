@@ -109,6 +109,7 @@ $router->get('/apis', [ApiController::class, 'index']);
 $router->get('/company', [CompanyController::class, 'profile']);
 $router->get('/users', [CompanyController::class, 'users']);
 $router->post('/users', [CompanyController::class, 'storeUser']);
+$router->post('/users/delete', [CompanyController::class, 'deleteUser']);
 $router->get('/roles', [CompanyController::class, 'roles']);
 $router->get('/company-settings', [CompanyController::class, 'settings']);
 $router->get('/billing', [BillingController::class, 'index']);

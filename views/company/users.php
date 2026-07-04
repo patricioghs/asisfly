@@ -71,7 +71,7 @@
     </div>
     <div class="table-responsive">
         <table class="table align-middle">
-            <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Creado</th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Creado</th><th class="text-end">Acciones</th></tr></thead>
             <tbody>
             <?php foreach ($users as $item): ?>
                 <tr>
@@ -80,10 +80,21 @@
                     <td><?= e($item['role_name']) ?></td>
                     <td><span class="status-pill"><?= e($item['status']) ?></span></td>
                     <td><?= e(substr((string) ($item['created_at'] ?? ''), 0, 10)) ?></td>
+                    <td class="text-end">
+                        <?php if ($item['status'] !== 'disabled' && (int) $item['id'] !== (int) ($_SESSION['user']['id'] ?? 0)): ?>
+                            <form method="post" action="<?= url('/users/delete') ?>" class="d-inline" onsubmit="return confirm('Eliminar el acceso de este usuario?');">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="user_id" value="<?= e((string) $item['id']) ?>">
+                                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-person-x"></i> Eliminar acceso</button>
+                            </form>
+                        <?php else: ?>
+                            <span class="text-muted small">Sin accion</span>
+                        <?php endif; ?>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($users)): ?>
-                <tr><td colspan="5" class="text-muted">Aun no hay usuarios creados para esta empresa.</td></tr>
+                <tr><td colspan="6" class="text-muted">Aun no hay usuarios creados para esta empresa.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
