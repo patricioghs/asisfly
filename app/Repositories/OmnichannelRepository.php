@@ -210,8 +210,9 @@ final class OmnichannelRepository
             $lastError = null;
 
             foreach ($uids as $uid) {
+                $uid = (int) $uid;
                 try {
-                    $overviewList = imap_fetch_overview($mailbox, (string) $uid, FT_UID);
+                    $overviewList = imap_fetch_overview($mailbox, $uid, FT_UID);
                     $overview = is_array($overviewList) ? ($overviewList[0] ?? null) : null;
                     if (!$overview) {
                         $skipped++;
@@ -527,9 +528,9 @@ final class OmnichannelRepository
 
     private function emailBody($mailbox, int $uid): string
     {
-        $body = (string) @imap_fetchbody($mailbox, (string) $uid, '1', FT_UID | FT_PEEK);
+        $body = (string) @imap_fetchbody($mailbox, $uid, '1', FT_UID | FT_PEEK);
         if (trim($body) === '') {
-            $body = (string) @imap_body($mailbox, (string) $uid, FT_UID | FT_PEEK);
+            $body = (string) @imap_body($mailbox, $uid, FT_UID | FT_PEEK);
         }
 
         $decoded = quoted_printable_decode($body);
