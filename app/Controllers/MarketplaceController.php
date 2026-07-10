@@ -18,7 +18,7 @@ final class MarketplaceController extends Controller
         $service = new MarketplaceService();
         $items = Database::available() ? $service->items($this->companyId()) : [];
         if (!$this->isSuperadmin()) {
-            $items = array_values(array_filter($items, fn (array $item): bool => ($item['ability_key'] ?? '') !== 'core_superadmin'));
+            $items = array_values(array_filter($items, fn (array $item): bool => ($item['resolved_ability_key'] ?? '') !== 'core_superadmin'));
         }
 
         $this->view('marketplace/index', [

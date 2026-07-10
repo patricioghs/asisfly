@@ -66,6 +66,7 @@ final class MarketplaceService
 
         $items = $statement->fetchAll(PDO::FETCH_ASSOC);
         foreach ($items as &$item) {
+            $item['resolved_ability_key'] = trim((string) ($item['resolved_ability_key'] ?? $item['marketplace_slug'] ?? ''));
             $item['dependencies'] = $this->dependencies((int) $item['ability_id'], $companyId);
             $item['is_protected'] = in_array($item['resolved_ability_key'], self::PROTECTED_ABILITIES, true);
             $item['display_title'] = $this->displayTitle($item);
@@ -181,6 +182,32 @@ final class MarketplaceService
 
     private function displayTitle(array $item): string
     {
+        $key = (string) ($item['resolved_ability_key'] ?? '');
+
+        foreach (['marketplace_title', 'commercial_name', 'ability_name'] as $field) {
+            $value = trim((string) ($item[$field] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return self::abilityLabel($key) ?: 'Habilidad AsisFly';
+    }
+
+    private function displayDescription(array $item): string
+    {
+        foreach (['long_description', 'short_description', 'ability_description'] as $field) {
+            $value = trim((string) ($item[$field] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return 'Habilidad modular de AsisFly lista para activar por empresa.';
+    }
+
+    public static function abilityLabel(string $abilityKey): string
+    {
         $labels = [
             'core_workspace' => 'Operacion diaria',
             'core_ai_assistant' => 'Asistente inteligente',
@@ -195,19 +222,8 @@ final class MarketplaceService
             'intelligence' => 'Inteligencia empresarial',
             'ai_brains' => 'Cerebros IA',
         ];
-        $key = (string) ($item['resolved_ability_key'] ?? '');
 
-        return trim((string) ($item['marketplace_title'] ?: $item['commercial_name'] ?: $item['ability_name'] ?: ($labels[$key] ?? $key)));
-    }
-
-    private function displayDescription(array $item): string
-    {
-        return trim((string) (
-            $item['long_description']
-            ?: $item['short_description']
-            ?: $item['ability_description']
-            ?: 'Habilidad modular de AsisFly lista para activar por empresa.'
-        ));
+        return $labels[$abilityKey] ?? '';
     }
 
     private function missingRequiredDependencies(int $abilityId, int $companyId): array

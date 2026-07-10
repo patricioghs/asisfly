@@ -21,6 +21,23 @@
             $isProtected = !empty($item['is_protected']);
             $itemTitle = trim((string) ($item['display_title'] ?: $abilityKey));
             $itemDescription = trim((string) ($item['display_description'] ?: 'Habilidad modular de AsisFly lista para activar por empresa.'));
+            if ($itemTitle === '' || $itemTitle === 'Habilidad AsisFly') {
+                $fallbackLabels = [
+                    'core_workspace' => 'Operacion diaria',
+                    'core_ai_assistant' => 'Asistente inteligente',
+                    'core_omnichannel' => 'Comunicacion inteligente',
+                    'core_memory_documents' => 'Memoria empresarial',
+                    'core_integrations' => 'Integraciones base',
+                    'core_company_admin' => 'Administracion de empresa',
+                    'core_superadmin' => 'Administracion global',
+                    'crm' => 'CRM comercial',
+                    'quotes' => 'Cotizaciones',
+                    'social_marketing' => 'Asisti Social',
+                    'intelligence' => 'Inteligencia empresarial',
+                    'ai_brains' => 'Cerebros IA',
+                ];
+                $itemTitle = $fallbackLabels[$abilityKey] ?? 'Habilidad AsisFly';
+            }
             $priceLabel = ($item['pricing_model'] ?? 'included') === 'included'
                 ? 'Incluida'
                 : 'Addon ' . (string) $item['currency'] . ' ' . number_format((float) $item['monthly_price'], 0) . '/mes';
