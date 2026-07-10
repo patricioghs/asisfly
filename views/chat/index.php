@@ -31,7 +31,7 @@
                         <small class="ai-status ai-status-<?= e($message['status']) ?>"><?= e($message['status']) ?></small>
                     <?php endif; ?>
                 </div>
-                <p><?= e($message['content']) ?></p>
+                <p><?= nl2br(e($message['content'])) ?></p>
             </div>
         <?php endforeach; ?>
         <div id="chatBottom" data-chat-bottom></div>

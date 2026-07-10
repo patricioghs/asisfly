@@ -20,18 +20,25 @@ final class OpenAiClient
             throw new RuntimeException('La extension cURL de PHP no esta habilitada.');
         }
 
+        $input = [
+            [
+                'role' => 'system',
+                'content' => $this->systemPrompt($context),
+            ],
+        ];
+
+        foreach ($this->historyMessages($context['history'] ?? []) as $message) {
+            $input[] = $message;
+        }
+
+        $input[] = [
+            'role' => 'user',
+            'content' => $prompt,
+        ];
+
         $payload = [
             'model' => $settings['model'],
-            'input' => [
-                [
-                    'role' => 'system',
-                    'content' => $this->systemPrompt($context),
-                ],
-                [
-                    'role' => 'user',
-                    'content' => $prompt,
-                ],
-            ],
+            'input' => $input,
             'temperature' => (float) ($settings['temperature'] ?? 0.4),
         ];
 
@@ -97,8 +104,28 @@ final class OpenAiClient
             'Reglas de atencion: ' . ($assistant['rules'] ?? 'Pedir aprobacion antes de acciones sensibles.'),
             'Escalar a humano cuando: ' . ($assistant['human_escalation'] ?? 'Riesgo comercial, legal o cliente molesto.'),
             $this->memoryPrompt($memory),
+            'Usa el historial reciente para interpretar respuestas cortas como "si", "ok" o "dale".',
             'Responde de forma util, accionable y breve. No inventes datos internos; si falta informacion, indica el supuesto.',
         ]));
+    }
+
+    private function historyMessages(array $history): array
+    {
+        $messages = [];
+        foreach (array_slice($history, -8) as $message) {
+            $role = (string) ($message['role'] ?? '');
+            $content = trim((string) ($message['content'] ?? ''));
+            if (!in_array($role, ['user', 'assistant'], true) || $content === '') {
+                continue;
+            }
+
+            $messages[] = [
+                'role' => $role,
+                'content' => $content,
+            ];
+        }
+
+        return $messages;
     }
 
     private function abilityPrompt(array $context): string

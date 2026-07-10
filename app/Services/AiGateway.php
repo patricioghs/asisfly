@@ -14,7 +14,7 @@ use Throwable;
 
 final class AiGateway
 {
-    public function ask(string $prompt, array $company, array $user): array
+    public function ask(string $prompt, array $company, array $user, array $history = []): array
     {
         $repo = new TenantRepository();
         $aiRepo = new AiProviderRepository();
@@ -81,6 +81,7 @@ final class AiGateway
                         'route' => $route,
                         'memory' => $memory,
                         'ai_context' => $aiContext,
+                        'history' => $history,
                     ]);
                     $response = $real['text'];
                     $promptTokens = $real['prompt_tokens'] > 0 ? $real['prompt_tokens'] : $estimatedPromptTokens;
@@ -154,8 +155,6 @@ final class AiGateway
                 'active_abilities' => array_column($aiContext['abilities'] ?? [], 'ability_key'),
             ],
         ]);
-
-        $response .= $this->autonomyNotice($autonomy);
 
         return ['answer' => $response, 'tokens' => $totalTokens, 'brain' => $route, 'status' => $status];
     }
@@ -281,12 +280,4 @@ final class AiGateway
         ]);
     }
 
-    private function autonomyNotice(array $autonomy): string
-    {
-        if (empty($autonomy['requires_all_approval'])) {
-            return "\n\nModo AsisFly: {$autonomy['label']} ({$autonomy['learning_progress']}%). Revisare las reglas de aprobacion antes de ejecutar acciones.";
-        }
-
-        return "\n\nModo AsisFly: {$autonomy['label']} ({$autonomy['learning_progress']}%). Estoy aprendiendo como funciona esta empresa; todo queda como sugerencia y requiere aprobacion, modificacion o comentario humano para mejorar.";
-    }
 }
