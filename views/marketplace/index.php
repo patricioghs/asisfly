@@ -15,6 +15,7 @@
     <?php foreach ($items as $item): ?>
         <?php
             $abilityKey = (string) ($item['resolved_ability_key'] ?: $item['marketplace_slug'] ?: '');
+            $abilityId = (int) ($item['ability_id'] ?? 0);
             $tenantStatus = $item['tenant_status'] ?: 'available';
             $isActive = $tenantStatus === 'active';
             $isDisabled = $tenantStatus === 'disabled';
@@ -81,6 +82,7 @@
                     <form method="post" action="<?= url('/marketplace/disable') ?>">
                         <?= csrf_field() ?>
                         <input type="hidden" name="ability_key" value="<?= e($abilityKey) ?>">
+                        <input type="hidden" name="ability_id" value="<?= e((string) $abilityId) ?>">
                         <button class="btn btn-outline-danger" <?= $isProtected ? 'disabled' : '' ?>>
                             <i class="bi bi-pause-circle"></i> Desactivar
                         </button>
@@ -90,6 +92,7 @@
                     <form method="post" action="<?= url('/marketplace/activate') ?>">
                         <?= csrf_field() ?>
                         <input type="hidden" name="ability_key" value="<?= e($abilityKey) ?>">
+                        <input type="hidden" name="ability_id" value="<?= e((string) $abilityId) ?>">
                         <button class="btn btn-primary"><i class="bi bi-lightning-charge"></i> <?= $isDisabled ? 'Reactivar' : 'Activar' ?></button>
                     </form>
                 <?php endif; ?>

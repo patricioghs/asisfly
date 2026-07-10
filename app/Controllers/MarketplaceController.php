@@ -34,7 +34,7 @@ final class MarketplaceController extends Controller
         $this->requireAuth();
         $this->ensureCanManageMarketplace();
 
-        $abilityKey = trim((string) ($_POST['ability_key'] ?? ''));
+        $abilityKey = trim((string) ($_POST['ability_key'] ?? $_POST['ability_id'] ?? ''));
         $result = (new MarketplaceService())->activate($this->companyId(), $abilityKey, (int) ($_SESSION['user']['id'] ?? 0));
 
         $_SESSION[$result['ok'] ? 'flash_success' : 'flash_error'] = $result['message'];
@@ -46,7 +46,7 @@ final class MarketplaceController extends Controller
         $this->requireAuth();
         $this->ensureCanManageMarketplace();
 
-        $abilityKey = trim((string) ($_POST['ability_key'] ?? ''));
+        $abilityKey = trim((string) ($_POST['ability_key'] ?? $_POST['ability_id'] ?? ''));
         $result = (new MarketplaceService())->disable($this->companyId(), $abilityKey, (int) ($_SESSION['user']['id'] ?? 0));
 
         $_SESSION[$result['ok'] ? 'flash_success' : 'flash_error'] = $result['message'];

@@ -60,6 +60,7 @@ final class MarketplaceService
                 ) latest ON latest.ability_id = a.id
                 WHERE mi.status = 'published'
                   AND a.status = 'active'
+                  AND TRIM(a.ability_key) <> ''
                 ORDER BY mi.sort_order, mi.title";
         $statement = Database::connection()->prepare($sql);
         $statement->execute(['company_id' => $companyId]);
@@ -165,6 +166,28 @@ final class MarketplaceService
         $ability = $this->registry->findByKey($key);
         if ($ability) {
             return $ability;
+        }
+
+        if (ctype_digit($key)) {
+            $statement = Database::connection()->prepare('SELECT * FROM abilities WHERE id = :id LIMIT 1');
+            $statement->execute(['id' => (int) $key]);
+            $row = $statement->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                return $row;
+            }
+
+            $statement = Database::connection()->prepare(
+                'SELECT a.*
+                 FROM marketplace_items mi
+                 INNER JOIN abilities a ON a.id = mi.ability_id
+                 WHERE mi.id = :id
+                 LIMIT 1'
+            );
+            $statement->execute(['id' => (int) $key]);
+            $row = $statement->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                return $row;
+            }
         }
 
         $statement = Database::connection()->prepare(
