@@ -8,6 +8,7 @@ use App\Core\Database;
 use App\Repositories\ActionRepository;
 use App\Repositories\AutonomyRepository;
 use App\Services\ConnectionTester;
+use App\Services\OmnichannelCommercialAutomation;
 use App\Services\OmnichannelAiResponder;
 use App\Services\SecretVault;
 use App\Services\SmtpMailer;
@@ -696,6 +697,7 @@ final class OmnichannelRepository
     {
         $autonomy = (new AutonomyRepository())->profile($companyId);
         $decision = $this->automationDecision($account, $message, $autonomy);
+        $commercial = (new OmnichannelCommercialAutomation())->handle($companyId, $account, $message, $decision);
 
         if ($decision['mode'] === 'human_required') {
             Database::connection()->prepare('UPDATE inbox_conversations SET status = "open", assigned_to = :assigned_to, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
@@ -705,6 +707,7 @@ final class OmnichannelRepository
             ]);
             $this->logEvent($companyId, (int) $account['id'], $conversationId, (string) $account['provider'], (string) $account['channel'], 'inbound', 'queued', [
                 'ai_decision' => $decision,
+                'commercial_automation' => $commercial,
                 'next_step' => 'human_review',
             ]);
 
@@ -724,6 +727,7 @@ final class OmnichannelRepository
             $this->logEvent($companyId, (int) $account['id'], $conversationId, (string) $account['provider'], (string) $account['channel'], 'inbound', 'queued', [
                 'ai_decision' => $decision,
                 'ai_draft' => $this->draftTrace($aiDraft),
+                'commercial_automation' => $commercial,
                 'draft_message_id' => $draftId,
                 'next_step' => 'approval',
             ]);
@@ -739,6 +743,7 @@ final class OmnichannelRepository
             'ai_autonomous' => true,
             'ai_decision' => $decision,
             'ai_draft' => $this->draftTrace($aiDraft),
+            'commercial_automation' => $commercial,
         ]);
 
         if (!empty($send['ok'])) {

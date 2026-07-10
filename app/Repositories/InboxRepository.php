@@ -494,6 +494,10 @@ final class InboxRepository
                     'draft_provider' => (string) ($payload['ai_draft']['provider'] ?? ''),
                     'draft_model' => (string) ($payload['ai_draft']['model'] ?? ''),
                     'memory_hits' => (int) ($payload['ai_draft']['memory_hits'] ?? 0),
+                    'commercial_ok' => (bool) ($payload['commercial_automation']['ok'] ?? false),
+                    'commercial_customer_id' => (int) ($payload['commercial_automation']['customer_id'] ?? 0),
+                    'commercial_actions' => $payload['commercial_automation']['actions'] ?? [],
+                    'commercial_reason' => (string) ($payload['commercial_automation']['reason'] ?? ''),
                     'created_at' => (string) ($row['created_at'] ?? ''),
                 ];
             }, $statement->fetchAll(PDO::FETCH_ASSOC))));

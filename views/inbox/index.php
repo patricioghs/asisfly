@@ -158,6 +158,11 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                                 <?php if (!empty($event['draft_status'])): ?>
                                     <small>Respuesta: <?= e($event['draft_status']) ?> / <?= e($event['draft_provider'] ?: 'simulated') ?> <?= e($event['draft_model'] ?? '') ?> - memoria <?= e((string) ($event['memory_hits'] ?? 0)) ?></small>
                                 <?php endif; ?>
+                                <?php if (!empty($event['commercial_ok'])): ?>
+                                    <small>CRM: <?= e(implode(', ', $event['commercial_actions'] ?? [])) ?><?= !empty($event['commercial_customer_id']) ? ' - cliente #' . e((string) $event['commercial_customer_id']) : '' ?></small>
+                                <?php elseif (!empty($event['commercial_reason'])): ?>
+                                    <small>CRM: <?= e($event['commercial_reason']) ?></small>
+                                <?php endif; ?>
                             </div>
                         </article>
                     <?php endforeach; ?>
