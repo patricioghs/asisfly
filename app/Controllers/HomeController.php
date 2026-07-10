@@ -93,7 +93,7 @@ final class HomeController extends Controller
     private function notificationItems(int $companyId, int $userId, array $filters): array
     {
         if (!Database::available()) {
-            return $this->fallbackNotifications();
+            return [];
         }
 
         $items = [
@@ -596,9 +596,6 @@ final class HomeController extends Controller
 
     private function fallbackNotifications(): array
     {
-        return array_map(fn (array $item): array => $this->normalizeNotification($item), [
-            ['id' => 'fallback-1', 'type' => 'message', 'type_label' => 'Omnicanal', 'module' => 'WhatsApp', 'title' => 'Hay clientes esperando respuesta', 'body' => 'Revisa mensajes comerciales pendientes.', 'status' => 'unread', 'priority' => 'high', 'risk' => 'medium', 'icon' => 'bi-whatsapp', 'action_url' => '/inbox', 'action_label' => 'Responder', 'created_at' => date('Y-m-d H:i:s', strtotime('-8 minutes'))],
-            ['id' => 'fallback-2', 'type' => 'quote', 'type_label' => 'Cotizaciones', 'module' => 'Cotizaciones', 'title' => 'Cotizaciones por vencer', 'body' => 'Hay propuestas que requieren seguimiento.', 'status' => 'pending', 'priority' => 'medium', 'risk' => 'medium', 'icon' => 'bi-file-earmark-text', 'action_url' => '/quotes', 'action_label' => 'Ver', 'created_at' => date('Y-m-d H:i:s', strtotime('-22 minutes'))],
-        ]);
+        return [];
     }
 }

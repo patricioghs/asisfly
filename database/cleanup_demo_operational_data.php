@@ -51,6 +51,7 @@ $demoActionTitles = [
 ];
 $demoCustomerEmails = ['valentina@pacifico.test', 'diego@gruponorte.test'];
 $demoProductSkus = ['AS-SOCIAL-PRO', 'AS-OMNI-SETUP', 'AS-CRM-BIZ', 'AS-TRAINING'];
+$demoControlKeys = ['control-gastos', 'control-pagos-pendientes', 'control-inventario-comercial', 'control-clientes-frios'];
 
 $in = static fn (array $values): string => implode(',', array_fill(0, count($values), '?'));
 
@@ -122,6 +123,24 @@ try {
             'Productos de cotizacion demo',
             'DELETE FROM quote_products WHERE sku IN (' . $in($demoProductSkus) . ')',
             $demoProductSkus
+        );
+    }
+
+    foreach (['business_control_entries', 'business_control_alerts'] as $table) {
+        if ($tableExists($table) && $tableExists('business_controls')) {
+            $execute(
+                "{$table} demo",
+                "DELETE FROM {$table} WHERE control_id IN (SELECT id FROM business_controls WHERE control_key IN (" . $in($demoControlKeys) . '))',
+                $demoControlKeys
+            );
+        }
+    }
+
+    if ($tableExists('business_controls')) {
+        $execute(
+            'Controles demo',
+            'DELETE FROM business_controls WHERE control_key IN (' . $in($demoControlKeys) . ')',
+            $demoControlKeys
         );
     }
 

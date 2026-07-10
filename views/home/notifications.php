@@ -102,7 +102,7 @@ $riskLabels = ['high' => 'Riesgo alto', 'medium' => 'Riesgo medio', 'low' => 'Ri
         </div>
         <div class="notification-rule high">
             <i class="bi bi-exclamation-octagon"></i>
-            <div><strong>Alta</strong><p>Clientes esperando respuesta, aprobaciones sensibles, pagos o cotizaciones por vencer.</p></div>
+            <div><strong>Alta</strong><p>Alertas reales que requieren atencion prioritaria por riesgo, fecha o impacto operativo.</p></div>
         </div>
         <div class="notification-rule medium">
             <i class="bi bi-activity"></i>
