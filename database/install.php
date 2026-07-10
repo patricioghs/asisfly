@@ -49,6 +49,11 @@ foreach ([
     __DIR__ . '/migrations/022_abilities_marketplace_schema.sql',
     __DIR__ . '/migrations/023_ai_tool_audit_schema.sql',
     __DIR__ . '/migrations/024_marketplace_installable_defaults.sql',
+    __DIR__ . '/migrations/025_marketplace_label_backfill.sql',
+    __DIR__ . '/migrations/026_marketplace_hide_invalid_abilities.sql',
+    __DIR__ . '/migrations/027_marketplace_canonical_catalog.sql',
+    __DIR__ . '/migrations/028_omnichannel_core_default.sql',
+    __DIR__ . '/migrations/029_ai_training_schema.sql',
     __DIR__ . '/seeders/002_demo_data.sql',
     __DIR__ . '/seeders/003_brains_data.sql',
     __DIR__ . '/seeders/004_social_data.sql',
@@ -62,6 +67,7 @@ foreach ([
     __DIR__ . '/seeders/012_subscriptions_demo.sql',
     __DIR__ . '/seeders/013_controls_demo.sql',
     __DIR__ . '/seeders/014_abilities_compatibility.sql',
+    __DIR__ . '/seeders/015_ai_training_seed.sql',
 ] as $file) {
     $sql = file_get_contents($file);
     if ($sql === false) {

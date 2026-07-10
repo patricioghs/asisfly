@@ -18,6 +18,8 @@ try {
         __DIR__ . '/migrations/026_marketplace_hide_invalid_abilities.sql',
         __DIR__ . '/migrations/027_marketplace_canonical_catalog.sql',
         __DIR__ . '/migrations/028_omnichannel_core_default.sql',
+        __DIR__ . '/migrations/029_ai_training_schema.sql',
+        __DIR__ . '/seeders/015_ai_training_seed.sql',
     ] as $file) {
         $sql = file_get_contents($file);
         if ($sql === false) {

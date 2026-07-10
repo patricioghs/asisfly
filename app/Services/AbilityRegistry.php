@@ -98,6 +98,7 @@ final class AbilityRegistry
                 ['/brains', 'Cerebros IA', 'bi-diagram-3', null],
             ],
             'Conocimiento' => [
+                ['/ai-training', 'Centro de Entrenamiento IA', 'bi-mortarboard', null],
                 ['/knowledge-base', 'Base de conocimiento', 'bi-book', null],
                 ['/documents', 'Documentos', 'bi-file-earmark', null],
                 ['/catalogs', 'Catalogos', 'bi-folder2-open', null],

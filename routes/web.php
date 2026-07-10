@@ -1,6 +1,7 @@
 <?php
 
 use App\Controllers\AdminController;
+use App\Controllers\AITrainingController;
 use App\Controllers\ActionController;
 use App\Controllers\ApiController;
 use App\Controllers\AssistantController;
@@ -88,6 +89,17 @@ $router->get('/knowledge-base', [KnowledgeController::class, 'base']);
 $router->get('/catalogs', [KnowledgeController::class, 'catalogs']);
 $router->get('/manuals', [KnowledgeController::class, 'manuals']);
 $router->get('/training', [KnowledgeController::class, 'training']);
+$router->get('/ai-training', [AITrainingController::class, 'index']);
+$router->post('/ai-training/onboarding', [AITrainingController::class, 'saveOnboarding']);
+$router->post('/ai-training/profile', [AITrainingController::class, 'saveProfile']);
+$router->post('/ai-training/personality', [AITrainingController::class, 'savePersonality']);
+$router->post('/ai-training/product', [AITrainingController::class, 'addProduct']);
+$router->post('/ai-training/rule', [AITrainingController::class, 'addRule']);
+$router->post('/ai-training/faq', [AITrainingController::class, 'addFaq']);
+$router->post('/ai-training/example', [AITrainingController::class, 'addExample']);
+$router->post('/ai-training/channel', [AITrainingController::class, 'saveChannel']);
+$router->post('/ai-training/simulate', [AITrainingController::class, 'simulate']);
+$router->post('/ai-training/publish', [AITrainingController::class, 'publish']);
 $router->get('/crm', [CrmController::class, 'index']);
 $router->post('/crm', [CrmController::class, 'store']);
 $router->post('/crm/note', [CrmController::class, 'addNote']);
