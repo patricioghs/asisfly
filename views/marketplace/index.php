@@ -14,27 +14,13 @@
 <section class="marketplace-grid mt-4">
     <?php foreach ($items as $item): ?>
         <?php
-            $abilityKey = (string) ($item['ability_key'] ?: $item['slug'] ?? '');
-            $abilityLabels = [
-                'core_workspace' => 'Operacion diaria',
-                'core_ai_assistant' => 'Asistente inteligente',
-                'core_omnichannel' => 'Comunicacion inteligente',
-                'core_memory_documents' => 'Memoria empresarial',
-                'core_integrations' => 'Integraciones base',
-                'core_company_admin' => 'Administracion de empresa',
-                'core_superadmin' => 'Administracion global',
-                'crm' => 'CRM comercial',
-                'quotes' => 'Cotizaciones',
-                'social_marketing' => 'Asisti Social',
-                'intelligence' => 'Inteligencia empresarial',
-                'ai_brains' => 'Cerebros IA',
-            ];
+            $abilityKey = (string) ($item['resolved_ability_key'] ?: $item['marketplace_slug'] ?: '');
             $tenantStatus = $item['tenant_status'] ?: 'available';
             $isActive = $tenantStatus === 'active';
             $isDisabled = $tenantStatus === 'disabled';
             $isProtected = !empty($item['is_protected']);
-            $itemTitle = trim((string) ($item['title'] ?: $item['commercial_name'] ?: $item['ability_name'] ?: ($abilityLabels[$abilityKey] ?? $abilityKey)));
-            $itemDescription = trim((string) ($item['long_description'] ?: $item['short_description'] ?: $item['ability_description'] ?: 'Habilidad modular de AsisFly lista para activar por empresa.'));
+            $itemTitle = trim((string) ($item['display_title'] ?: $abilityKey));
+            $itemDescription = trim((string) ($item['display_description'] ?: 'Habilidad modular de AsisFly lista para activar por empresa.'));
             $priceLabel = ($item['pricing_model'] ?? 'included') === 'included'
                 ? 'Incluida'
                 : 'Addon ' . (string) $item['currency'] . ' ' . number_format((float) $item['monthly_price'], 0) . '/mes';
