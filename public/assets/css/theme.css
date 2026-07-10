@@ -2685,7 +2685,13 @@ a {
   color: var(--asisty-success);
 }
 
+.status-available {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--asisty-primary);
+}
+
 .status-paused,
+.status-disabled,
 .status-archived,
 .status-dismissed {
   background: rgba(100, 116, 139, 0.14);
@@ -2755,6 +2761,136 @@ a {
 .tone-dark {
   background: rgba(15, 23, 42, 0.1);
   color: var(--asisty-text) !important;
+}
+
+.marketplace-hero {
+  align-items: center;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.55fr);
+}
+
+.marketplace-hero h2 {
+  color: var(--asisty-text);
+  font-size: clamp(1.55rem, 2.2vw, 2.2rem);
+  font-weight: 850;
+  margin: 4px 0 8px;
+}
+
+.marketplace-hero p,
+.marketplace-card p,
+.marketplace-dependencies small,
+.marketplace-actions small {
+  color: var(--asisty-muted);
+  margin: 0;
+}
+
+.marketplace-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.marketplace-summary span,
+.marketplace-meta span,
+.dependency-chip {
+  background: var(--asisty-surface-soft);
+  border: 1px solid var(--asisty-border);
+  border-radius: 999px;
+  color: var(--asisty-muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 8px 10px;
+}
+
+.marketplace-summary strong {
+  color: var(--asisty-text);
+  display: block;
+  font-size: 1.3rem;
+}
+
+.marketplace-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.marketplace-card {
+  display: grid;
+  gap: 16px;
+  min-height: 390px;
+}
+
+.marketplace-card-head {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.marketplace-card h3 {
+  color: var(--asisty-text);
+  font-size: 1.05rem;
+  font-weight: 850;
+  margin: 3px 0 0;
+}
+
+.marketplace-icon {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(124, 58, 237, 0.14));
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: 14px;
+  color: var(--asisty-primary);
+  display: grid;
+  font-size: 1.15rem;
+  height: 44px;
+  justify-items: center;
+  width: 44px;
+}
+
+.marketplace-meta,
+.marketplace-dependencies div,
+.marketplace-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.marketplace-meta span,
+.dependency-chip {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.marketplace-dependencies {
+  display: grid;
+  gap: 8px;
+}
+
+.marketplace-dependencies strong {
+  color: var(--asisty-text);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.dependency-chip.ready {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.18);
+  color: var(--asisty-success);
+}
+
+.dependency-chip.pending {
+  background: rgba(249, 115, 22, 0.12);
+  border-color: rgba(249, 115, 22, 0.18);
+  color: var(--asisty-warning);
+}
+
+.dependency-chip small {
+  color: inherit;
+  font-size: 0.68rem;
+  opacity: 0.8;
 }
 
 .kpi-icon.tone-success {
@@ -2874,6 +3010,10 @@ a {
 }
 
 [data-bs-theme="dark"] .approval-card h3,
+[data-bs-theme="dark"] .marketplace-hero h2,
+[data-bs-theme="dark"] .marketplace-card h3,
+[data-bs-theme="dark"] .marketplace-summary strong,
+[data-bs-theme="dark"] .marketplace-dependencies strong,
 [data-bs-theme="dark"] .approval-hero h2,
 [data-bs-theme="dark"] .approval-autonomy h2,
 [data-bs-theme="dark"] .approval-detail-grid span,
@@ -2901,6 +3041,13 @@ a {
 [data-bs-theme="dark"] .account-credential-summary dd,
 [data-bs-theme="dark"] .account-empty-state h2 {
   color: #f8fafc;
+}
+
+[data-bs-theme="dark"] .marketplace-summary span,
+[data-bs-theme="dark"] .marketplace-meta span,
+[data-bs-theme="dark"] .dependency-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(148, 163, 184, 0.2);
 }
 
 @media (max-width: 1180px) {
@@ -2972,6 +3119,7 @@ a {
   .approval-filter-bar,
   .approval-detail-grid,
   .approval-workspace,
+  .marketplace-hero,
   .brain-config-grid,
   .brain-rules,
   .task-card,
@@ -2992,6 +3140,7 @@ a {
   .dashboard-kpis,
   .performance-summary,
   .approval-metrics,
+  .marketplace-grid,
   .workbench-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3028,6 +3177,8 @@ a {
   .performance-summary,
   .integration-strip,
   .approval-metrics,
+  .marketplace-grid,
+  .marketplace-summary,
   .workbench-metrics,
   .workbench-card,
   .notification-card,

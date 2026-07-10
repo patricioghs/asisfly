@@ -114,6 +114,7 @@ final class AbilityRegistry
                 ['/users', 'Usuarios', 'bi-people', null],
                 ['/roles', 'Roles', 'bi-shield-lock', null],
                 ['/billing', 'Plan y facturacion', 'bi-credit-card', null],
+                ['/marketplace', 'Marketplace', 'bi-boxes', null],
                 ['/company-settings', 'Configuracion', 'bi-gear', null],
             ],
             'Administracion (Superadmin)' => [

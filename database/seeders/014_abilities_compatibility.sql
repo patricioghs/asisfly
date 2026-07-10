@@ -90,6 +90,7 @@ JOIN (
   UNION ALL SELECT 'core_company_admin', 'Empresa', 'Usuarios', '/users', 'bi-people', 'users.manage', 20
   UNION ALL SELECT 'core_company_admin', 'Empresa', 'Roles', '/roles', 'bi-shield-lock', 'users.manage', 30
   UNION ALL SELECT 'core_company_admin', 'Empresa', 'Plan y facturacion', '/billing', 'bi-credit-card', 'billing.manage', 40
+  UNION ALL SELECT 'core_company_admin', 'Empresa', 'Marketplace', '/marketplace', 'bi-boxes', 'billing.manage', 45
   UNION ALL SELECT 'core_company_admin', 'Empresa', 'Configuracion', '/company-settings', 'bi-gear', 'company.manage', 50
   UNION ALL SELECT 'core_superadmin', 'Administracion (Superadmin)', 'Empresas', '/admin/companies', 'bi-buildings', '*', 10
   UNION ALL SELECT 'core_superadmin', 'Administracion (Superadmin)', 'Planes', '/admin/plans', 'bi-check2-square', '*', 20
