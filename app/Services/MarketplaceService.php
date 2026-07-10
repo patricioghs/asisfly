@@ -222,6 +222,10 @@ final class MarketplaceService
     private function displayTitle(array $item): string
     {
         $key = (string) ($item['resolved_ability_key'] ?? '');
+        $officialLabel = self::abilityLabel($key);
+        if ($officialLabel !== '') {
+            return $officialLabel;
+        }
 
         foreach (['marketplace_title', 'commercial_name', 'ability_name'] as $field) {
             $value = trim((string) ($item[$field] ?? ''));
@@ -235,6 +239,12 @@ final class MarketplaceService
 
     private function displayDescription(array $item): string
     {
+        $key = (string) ($item['resolved_ability_key'] ?? '');
+        $officialDescription = self::abilityDescription($key);
+        if ($officialDescription !== '') {
+            return $officialDescription;
+        }
+
         foreach (['long_description', 'short_description', 'ability_description'] as $field) {
             $value = trim((string) ($item[$field] ?? ''));
             if ($value !== '') {
@@ -263,6 +273,26 @@ final class MarketplaceService
         ];
 
         return $labels[$abilityKey] ?? '';
+    }
+
+    public static function abilityDescription(string $abilityKey): string
+    {
+        $descriptions = [
+            'core_workspace' => 'Dashboard, Mi dia, Bandeja de trabajo y Notificaciones para operar cada jornada.',
+            'core_ai_assistant' => 'Chat IA, tareas, automatizaciones, aprobaciones, controles y reglas del asistente.',
+            'core_omnichannel' => 'Bandeja omnicanal y cuentas conectadas para centralizar correos y mensajes.',
+            'core_memory_documents' => 'Documentos, base de conocimiento, catalogos, manuales y entrenamiento empresarial.',
+            'core_integrations' => 'Integraciones, APIs y conectores base para conectar AsisFly con otras plataformas.',
+            'core_company_admin' => 'Empresa, usuarios, roles, plan, facturacion y configuracion general.',
+            'core_superadmin' => 'Panel global para administrar empresas, planes, consumo IA, auditoria y estado del sistema.',
+            'crm' => 'Clientes, contactos, oportunidades, tareas, notas y seguimiento comercial.',
+            'quotes' => 'Cotizaciones, productos, impuestos, descuentos, estados y envio comercial.',
+            'social_marketing' => 'Calendario editorial, ideas, copies, campanas, hashtags y publicaciones por canal.',
+            'intelligence' => 'Reportes, analytics, dashboards, Excel, indicadores, KPIs y analisis de negocio.',
+            'ai_brains' => 'Cerebros comercial, administrativo, analitico, operacional y ejecutivo por empresa.',
+        ];
+
+        return $descriptions[$abilityKey] ?? '';
     }
 
     private function missingRequiredDependencies(int $abilityId, int $companyId): array
