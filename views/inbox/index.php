@@ -99,10 +99,54 @@ $latestDraft = $selected['latest_draft'] ?? null;
 
             <div class="inbox-thread">
                 <?php foreach ($selected['messages'] as $message): ?>
+                    <?php
+                        $formattedBody = \App\Services\EmailBodyFormatter::formatEmailBody((string) ($message['body'] ?? ''));
+                        $recipientLabel = ($message['direction'] ?? '') === 'outbound'
+                            ? ($selected['customer_name'] ?? 'Cliente')
+                            : ($selected['account_name'] ?: 'AsisFly');
+                    ?>
                     <div class="inbox-message <?= e($message['direction']) ?>">
-                        <strong><?= e($message['sender_name']) ?></strong>
-                        <p><?= e($message['body']) ?></p>
-                        <small><?= e(($messageStatusOptions[$message['status'] ?? 'sent'] ?? ($message['status'] ?? 'Enviado')) . ' - ' . ($message['created_at'] ?? '')) ?></small>
+                        <div class="email-message-header">
+                            <div>
+                                <span>Remitente</span>
+                                <strong><?= e($message['sender_name']) ?></strong>
+                            </div>
+                            <div>
+                                <span>Para</span>
+                                <strong><?= e($recipientLabel) ?></strong>
+                            </div>
+                            <div>
+                                <span>Fecha</span>
+                                <strong><?= e($message['created_at'] ?? '-') ?></strong>
+                            </div>
+                            <div>
+                                <span>Asunto</span>
+                                <strong><?= e($selected['subject'] ?? '-') ?></strong>
+                            </div>
+                            <div>
+                                <span>Canal</span>
+                                <strong><?= e($selected['account_name'] ?: $selected['channel']) ?></strong>
+                            </div>
+                            <div>
+                                <span>Estado</span>
+                                <strong><?= e($messageStatusOptions[$message['status'] ?? 'sent'] ?? ($message['status'] ?? 'Enviado')) ?></strong>
+                            </div>
+                        </div>
+                        <div class="email-message-body">
+                            <?= $formattedBody['body_html'] ?>
+                        </div>
+                        <?php if ($formattedBody['has_signature']): ?>
+                            <details class="email-collapsible">
+                                <summary>Firma</summary>
+                                <div><?= $formattedBody['signature_html'] ?></div>
+                            </details>
+                        <?php endif; ?>
+                        <?php if ($formattedBody['has_quoted']): ?>
+                            <details class="email-collapsible quoted">
+                                <summary>Historial citado</summary>
+                                <div><?= $formattedBody['quoted_html'] ?></div>
+                            </details>
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
             </div>

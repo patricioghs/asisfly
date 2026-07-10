@@ -1373,28 +1373,104 @@ body {
 
 .inbox-thread {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .inbox-message {
-  max-width: 78%;
+  max-width: min(860px, 100%);
   border: 1px solid var(--asisty-line);
-  border-radius: 8px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.65);
+  border-radius: 14px;
+  padding: 0;
+  background: #fff;
+  overflow: hidden;
 }
 
 .inbox-message.outbound {
   justify-self: end;
-  background: rgba(15, 159, 142, 0.09);
+  background: #f7fffc;
 }
 
 .inbox-message p {
-  margin: 6px 0;
+  margin: 0 0 12px;
 }
 
 .inbox-message small {
   color: #667085;
+}
+
+.email-message-header {
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  border-bottom: 1px solid var(--asisty-line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px;
+}
+
+.email-message-header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.email-message-header span {
+  color: #667085;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.email-message-header strong {
+  color: var(--asisty-ink);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.email-message-body {
+  color: var(--asisty-ink);
+  font-size: 0.96rem;
+  line-height: 1.7;
+  padding: 18px;
+}
+
+.email-message-body p:last-child,
+.email-collapsible p:last-child {
+  margin-bottom: 0;
+}
+
+.email-message-body a,
+.email-collapsible a {
+  color: var(--asisty-primary);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.email-message-body blockquote {
+  border-left: 3px solid var(--asisty-line);
+  color: #667085;
+  margin: 12px 0;
+  padding-left: 12px;
+}
+
+.email-collapsible {
+  border-top: 1px solid var(--asisty-line);
+  padding: 0;
+}
+
+.email-collapsible summary {
+  color: #475467;
+  cursor: pointer;
+  font-weight: 850;
+  list-style-position: inside;
+  padding: 12px 18px;
+}
+
+.email-collapsible div {
+  background: #f8fafc;
+  color: #667085;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  padding: 14px 18px;
 }
 
 .inbox-suggest {
@@ -1919,6 +1995,14 @@ body {
 
   .topbar-actions {
     grid-column: 1 / -1;
+  }
+
+  .email-message-header {
+    grid-template-columns: 1fr;
+  }
+
+  .inbox-message {
+    max-width: 100%;
   }
 
   .workspace-badge {
