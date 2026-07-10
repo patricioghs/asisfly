@@ -1,15 +1,15 @@
 INSERT INTO abilities (ability_key, name, commercial_name, category, description, status, is_core, is_default_enabled, sort_order, metadata_json) VALUES
 ('core_workspace', 'Core Workspace', 'Operacion diaria', 'core', 'Dashboard, Mi dia, Bandeja de trabajo y Notificaciones.', 'active', TRUE, TRUE, 10, JSON_OBJECT('phase','compatibility')),
 ('core_ai_assistant', 'Core AI Assistant', 'Asistente inteligente', 'core', 'Chat IA, tareas, automatizaciones, aprobaciones, controles y reglas.', 'active', TRUE, TRUE, 20, JSON_OBJECT('phase','compatibility')),
-('core_omnichannel', 'Core Omnichannel', 'Comunicacion inteligente', 'base', 'Bandeja omnicanal y cuentas conectadas.', 'active', TRUE, TRUE, 30, JSON_OBJECT('phase','compatibility')),
+('core_omnichannel', 'Core Omnichannel', 'Comunicacion inteligente', 'base', 'Bandeja omnicanal y cuentas conectadas.', 'active', TRUE, FALSE, 30, JSON_OBJECT('phase','compatibility','installable',true)),
 ('core_memory_documents', 'Core Memory Documents', 'Memoria empresarial', 'base', 'Documentos, lectura de archivos, base de conocimiento, catalogos, manuales y entrenamiento.', 'active', TRUE, TRUE, 40, JSON_OBJECT('phase','compatibility')),
 ('core_integrations', 'Core Integrations', 'Integraciones base', 'core', 'Integraciones, APIs y conectores base.', 'active', TRUE, TRUE, 50, JSON_OBJECT('phase','compatibility')),
 ('core_company_admin', 'Core Company Admin', 'Administracion de empresa', 'core', 'Empresa, usuarios, roles, plan y configuracion.', 'active', TRUE, TRUE, 60, JSON_OBJECT('phase','compatibility')),
 ('core_superadmin', 'Core Superadmin', 'Administracion global', 'core', 'Panel Superadmin para soporte, planes, empresas, IA y auditoria.', 'active', TRUE, TRUE, 70, JSON_OBJECT('phase','compatibility','requires','*')),
-('crm', 'CRM', 'CRM comercial', 'professional', 'Clientes, contactos, oportunidades, tareas y seguimiento comercial.', 'active', FALSE, TRUE, 100, JSON_OBJECT('phase','compatibility')),
-('quotes', 'Quotes', 'Cotizaciones', 'professional', 'Cotizaciones, productos, impuestos, PDF y seguimiento.', 'active', FALSE, TRUE, 110, JSON_OBJECT('phase','compatibility')),
-('social_marketing', 'Social Marketing', 'Asisti Social', 'professional', 'Calendario editorial, copies, campanas y publicaciones.', 'active', FALSE, TRUE, 120, JSON_OBJECT('phase','compatibility')),
-('intelligence', 'Business Intelligence', 'Inteligencia empresarial', 'professional', 'Reportes, analytics, dashboards, Excel, indicadores y KPIs.', 'active', FALSE, TRUE, 130, JSON_OBJECT('phase','compatibility')),
+('crm', 'CRM', 'CRM comercial', 'professional', 'Clientes, contactos, oportunidades, tareas y seguimiento comercial.', 'active', FALSE, FALSE, 100, JSON_OBJECT('phase','compatibility','installable',true)),
+('quotes', 'Quotes', 'Cotizaciones', 'professional', 'Cotizaciones, productos, impuestos, PDF y seguimiento.', 'active', FALSE, FALSE, 110, JSON_OBJECT('phase','compatibility','installable',true)),
+('social_marketing', 'Social Marketing', 'Asisti Social', 'professional', 'Calendario editorial, copies, campanas y publicaciones.', 'active', FALSE, FALSE, 120, JSON_OBJECT('phase','compatibility','installable',true)),
+('intelligence', 'Business Intelligence', 'Inteligencia empresarial', 'professional', 'Reportes, analytics, dashboards, Excel, indicadores y KPIs.', 'active', FALSE, FALSE, 130, JSON_OBJECT('phase','compatibility','installable',true)),
 ('ai_brains', 'AI Brains', 'Cerebros IA', 'base', 'Cerebros comercial, administrativo, analitico, operacional y ejecutivo.', 'active', TRUE, TRUE, 140, JSON_OBJECT('phase','compatibility'))
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),

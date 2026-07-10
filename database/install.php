@@ -48,6 +48,7 @@ foreach ([
     __DIR__ . '/migrations/021_omnichannel_credentials_schema.sql',
     __DIR__ . '/migrations/022_abilities_marketplace_schema.sql',
     __DIR__ . '/migrations/023_ai_tool_audit_schema.sql',
+    __DIR__ . '/migrations/024_marketplace_installable_defaults.sql',
     __DIR__ . '/seeders/002_demo_data.sql',
     __DIR__ . '/seeders/003_brains_data.sql',
     __DIR__ . '/seeders/004_social_data.sql',

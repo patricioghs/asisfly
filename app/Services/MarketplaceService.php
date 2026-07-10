@@ -84,7 +84,7 @@ final class MarketplaceService
         $pdo->prepare(
             "INSERT INTO tenant_abilities (company_id, ability_id, ability_version_id, status, installed_by, installed_at, activated_at, settings_json)
              VALUES (:company_id, :ability_id, :ability_version_id, 'active', :installed_by, NOW(), NOW(), JSON_OBJECT('marketplace', TRUE))
-             ON DUPLICATE KEY UPDATE status = 'active', activated_at = NOW(), disabled_at = NULL"
+             ON DUPLICATE KEY UPDATE status = 'active', activated_at = NOW(), disabled_at = NULL, settings_json = JSON_SET(COALESCE(settings_json, JSON_OBJECT()), '$.marketplace', TRUE)"
         )->execute([
             'company_id' => $companyId,
             'ability_id' => (int) $ability['id'],

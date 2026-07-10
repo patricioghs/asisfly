@@ -13,6 +13,7 @@ try {
         __DIR__ . '/migrations/022_abilities_marketplace_schema.sql',
         __DIR__ . '/migrations/023_ai_tool_audit_schema.sql',
         __DIR__ . '/seeders/014_abilities_compatibility.sql',
+        __DIR__ . '/migrations/024_marketplace_installable_defaults.sql',
     ] as $file) {
         $sql = file_get_contents($file);
         if ($sql === false) {

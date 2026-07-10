@@ -14,11 +14,26 @@
 <section class="marketplace-grid mt-4">
     <?php foreach ($items as $item): ?>
         <?php
+            $abilityKey = (string) ($item['ability_key'] ?: $item['slug'] ?? '');
+            $abilityLabels = [
+                'core_workspace' => 'Operacion diaria',
+                'core_ai_assistant' => 'Asistente inteligente',
+                'core_omnichannel' => 'Comunicacion inteligente',
+                'core_memory_documents' => 'Memoria empresarial',
+                'core_integrations' => 'Integraciones base',
+                'core_company_admin' => 'Administracion de empresa',
+                'core_superadmin' => 'Administracion global',
+                'crm' => 'CRM comercial',
+                'quotes' => 'Cotizaciones',
+                'social_marketing' => 'Asisti Social',
+                'intelligence' => 'Inteligencia empresarial',
+                'ai_brains' => 'Cerebros IA',
+            ];
             $tenantStatus = $item['tenant_status'] ?: 'available';
             $isActive = $tenantStatus === 'active';
             $isDisabled = $tenantStatus === 'disabled';
             $isProtected = !empty($item['is_protected']);
-            $itemTitle = trim((string) ($item['title'] ?: $item['commercial_name'] ?: $item['ability_name'] ?: $item['ability_key']));
+            $itemTitle = trim((string) ($item['title'] ?: $item['commercial_name'] ?: $item['ability_name'] ?: ($abilityLabels[$abilityKey] ?? $abilityKey)));
             $itemDescription = trim((string) ($item['long_description'] ?: $item['short_description'] ?: $item['ability_description'] ?: 'Habilidad modular de AsisFly lista para activar por empresa.'));
             $priceLabel = ($item['pricing_model'] ?? 'included') === 'included'
                 ? 'Incluida'
@@ -27,7 +42,7 @@
         <article class="marketplace-card panel">
             <div class="marketplace-card-head">
                 <div class="marketplace-icon"><i class="bi bi-boxes"></i></div>
-                <div>
+                <div class="marketplace-title">
                     <span class="eyebrow"><?= e((string) $item['category']) ?></span>
                     <h3><?= e($itemTitle) ?></h3>
                 </div>
@@ -62,7 +77,7 @@
                 <?php if ($isActive): ?>
                     <form method="post" action="<?= url('/marketplace/disable') ?>">
                         <?= csrf_field() ?>
-                        <input type="hidden" name="ability_key" value="<?= e((string) $item['ability_key']) ?>">
+                        <input type="hidden" name="ability_key" value="<?= e($abilityKey) ?>">
                         <button class="btn btn-outline-danger" <?= $isProtected ? 'disabled' : '' ?>>
                             <i class="bi bi-pause-circle"></i> Desactivar
                         </button>
@@ -71,8 +86,8 @@
                 <?php else: ?>
                     <form method="post" action="<?= url('/marketplace/activate') ?>">
                         <?= csrf_field() ?>
-                        <input type="hidden" name="ability_key" value="<?= e((string) $item['ability_key']) ?>">
-                        <button class="btn btn-primary"><i class="bi bi-lightning-charge"></i> Activar</button>
+                        <input type="hidden" name="ability_key" value="<?= e($abilityKey) ?>">
+                        <button class="btn btn-primary"><i class="bi bi-lightning-charge"></i> <?= $isDisabled ? 'Reactivar' : 'Activar' ?></button>
                     </form>
                 <?php endif; ?>
             </div>
