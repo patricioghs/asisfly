@@ -130,7 +130,7 @@ $filterFields = function () use ($filters): void { ?>
         </div>
         <div class="workbench-rule">
             <i class="bi bi-1-circle"></i>
-            <div><strong>Parte por urgentes</strong><p>Mensajes, clientes calientes y aprobaciones de riesgo alto suben primero.</p></div>
+            <div><strong>Parte por urgentes</strong><p>Mensajes, tareas y aprobaciones de mayor prioridad suben primero.</p></div>
         </div>
         <div class="workbench-rule">
             <i class="bi bi-2-circle"></i>

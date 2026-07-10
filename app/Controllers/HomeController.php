@@ -14,14 +14,18 @@ final class HomeController extends Controller
     {
         $this->requireAuth();
 
+        $items = $this->workbenchItems($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), [
+            'view' => 'mine',
+            'type' => '',
+            'priority' => '',
+            'q' => '',
+        ]);
+
         $this->view('home/my-day', [
             'title' => 'Mi dia',
-            'agenda' => [
-                ['time' => '09:00', 'title' => 'Revision ejecutiva', 'detail' => 'Ventas, mensajes pendientes y prioridades del dia.', 'status' => 'Listo'],
-                ['time' => '10:30', 'title' => 'Responder clientes calientes', 'detail' => '8 conversaciones con intencion comercial alta.', 'status' => 'Pendiente'],
-                ['time' => '12:00', 'title' => 'Enviar cotizaciones por vencer', 'detail' => '2 cotizaciones vencen hoy y requieren seguimiento.', 'status' => 'Urgente'],
-                ['time' => '16:00', 'title' => 'Reporte de cierre', 'detail' => 'Resumen de ventas, tareas y oportunidades recuperadas.', 'status' => 'Programado'],
-            ],
+            'agenda' => $this->myDayAgenda($items),
+            'suggestions' => $this->myDaySuggestions($items),
+            'priorityItem' => $this->myDayPriorityItem($items),
         ]);
     }
 
@@ -319,7 +323,7 @@ final class HomeController extends Controller
     private function workbenchItems(int $companyId, int $userId, array $filters): array
     {
         if (!Database::available()) {
-            return $this->fallbackWorkbenchItems();
+            return [];
         }
 
         $items = [
@@ -346,6 +350,51 @@ final class HomeController extends Controller
 
         usort($items, fn (array $a, array $b): int => [$this->priorityWeight($b['priority']), $b['sort_at']] <=> [$this->priorityWeight($a['priority']), $a['sort_at']]);
         return array_slice($items, 0, 40);
+    }
+
+    private function myDayAgenda(array $items): array
+    {
+        return array_map(function (array $item): array {
+            return [
+                'time' => (string) ($item['due_label'] ?? 'Hoy'),
+                'title' => (string) ($item['title'] ?? 'Pendiente'),
+                'detail' => (string) ($item['detail'] ?? ''),
+                'status' => (string) ($item['status'] ?? 'pending'),
+            ];
+        }, array_slice($items, 0, 4));
+    }
+
+    private function myDaySuggestions(array $items): array
+    {
+        $suggestions = [];
+        foreach ($items as $item) {
+            $priority = (string) ($item['priority'] ?? 'medium');
+            if (!in_array($priority, ['critical', 'high'], true)) {
+                continue;
+            }
+
+            $suggestions[] = [
+                'title' => (string) ($item['title'] ?? 'Revisar pendiente'),
+                'detail' => (string) ($item['detail'] ?? 'Hay un pendiente real que requiere atencion.'),
+            ];
+
+            if (count($suggestions) >= 3) {
+                break;
+            }
+        }
+
+        return $suggestions;
+    }
+
+    private function myDayPriorityItem(array $items): ?array
+    {
+        foreach ($items as $item) {
+            if (in_array((string) ($item['priority'] ?? ''), ['critical', 'high'], true)) {
+                return $item;
+            }
+        }
+
+        return $items[0] ?? null;
     }
 
     private function normalizeWorkbenchItem(array $item): array
@@ -542,10 +591,7 @@ final class HomeController extends Controller
 
     private function fallbackWorkbenchItems(): array
     {
-        return [
-            ['id' => 1, 'type' => 'message', 'module' => 'WhatsApp', 'title' => 'Responder cliente caliente', 'detail' => 'Cliente pregunta por disponibilidad y despacho.', 'customer' => 'Cliente XYZ', 'priority' => 'high', 'status' => 'open', 'risk' => 'medium', 'icon' => 'bi-whatsapp', 'action_label' => 'Responder', 'action_url' => '/inbox', 'sort_at' => time(), 'due_label' => 'Hoy'],
-            ['id' => 2, 'type' => 'approval', 'module' => 'Aprobaciones', 'title' => 'Aprobar respuesta sugerida', 'detail' => 'AsisFly preparo una respuesta comercial que requiere autorizacion.', 'customer' => 'Cerebro Comercial', 'priority' => 'high', 'status' => 'pending', 'risk' => 'high', 'icon' => 'bi-shield-check', 'action_label' => 'Revisar', 'action_url' => '/actions', 'sort_at' => time() - 60, 'due_label' => 'Ahora'],
-        ];
+        return [];
     }
 
     private function fallbackNotifications(): array
