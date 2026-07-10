@@ -81,12 +81,16 @@ final class OpenAiClient
         $company = $context['company'] ?? [];
         $route = $context['route'] ?? [];
         $memory = $context['memory'] ?? [];
+        $aiContext = $context['ai_context'] ?? [];
 
         return implode("\n", array_filter([
             'Eres AsisFly, un empleado digital multiempresa para Latinoamerica.',
             'Empresa: ' . ($company['name'] ?? 'Empresa'),
             'Pais: ' . ($company['country'] ?? 'LatAm') . '. Moneda: ' . ($company['currency'] ?? 'USD') . '.',
             'Cerebro activo: ' . ($route['name'] ?? 'Cerebro Ejecutivo') . '. Modulo: ' . ($route['module'] ?? 'Direccion') . '.',
+            $this->abilityPrompt($aiContext),
+            $this->toolPrompt($aiContext),
+            $this->planPrompt($aiContext),
             'Nombre configurado: ' . ($assistant['name'] ?? 'AsisFly'),
             'Tono: ' . ($assistant['tone'] ?? 'Cercano y ejecutivo'),
             'Idioma principal: ' . ($assistant['language'] ?? 'Espanol latino'),
@@ -95,6 +99,40 @@ final class OpenAiClient
             $this->memoryPrompt($memory),
             'Responde de forma util, accionable y breve. No inventes datos internos; si falta informacion, indica el supuesto.',
         ]));
+    }
+
+    private function abilityPrompt(array $context): string
+    {
+        $abilities = array_map(
+            fn (array $ability): string => (string) ($ability['ability_key'] ?? ''),
+            $context['abilities'] ?? []
+        );
+        $abilities = array_values(array_filter($abilities));
+
+        return $abilities
+            ? 'Habilidades activas de esta empresa: ' . implode(', ', $abilities) . '. No menciones ni uses modulos fuera de esta lista.'
+            : 'Habilidades activas: no disponibles. Usa comportamiento seguro y no ejecutes herramientas.';
+    }
+
+    private function toolPrompt(array $context): string
+    {
+        $allowed = array_keys($context['tools']['allowed'] ?? []);
+        $blocked = array_keys($context['tools']['blocked'] ?? []);
+
+        return implode("\n", array_filter([
+            $allowed ? 'Herramientas IA permitidas para este usuario: ' . implode(', ', $allowed) . '.' : 'Herramientas IA permitidas: ninguna.',
+            $blocked ? 'Herramientas IA bloqueadas: ' . implode(', ', $blocked) . '. Si el usuario pide una de ellas, indica que no tiene autorizacion.' : null,
+        ]));
+    }
+
+    private function planPrompt(array $context): string
+    {
+        $limits = $context['plan_limits'] ?? [];
+        if (!$limits) {
+            return '';
+        }
+
+        return 'Limites del plan: ' . json_encode($limits, JSON_UNESCAPED_UNICODE) . '. Respeta estos limites y no prometas capacidades no incluidas.';
     }
 
     private function memoryPrompt(array $memory): string

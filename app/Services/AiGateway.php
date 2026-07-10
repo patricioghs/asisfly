@@ -19,8 +19,41 @@ final class AiGateway
         $repo = new TenantRepository();
         $aiRepo = new AiProviderRepository();
         $route = (new BrainRouter())->route($prompt);
+        $contextBuilder = new AiContextBuilder();
+        $aiContext = $contextBuilder->build($company, $user, $route, $prompt);
+        $toolRegistry = new AiToolRegistry();
+        $primaryTool = $this->primaryToolForRoute($route, $prompt);
+        if ($primaryTool !== null && !$contextBuilder->isToolAllowed($aiContext, $primaryTool)) {
+            $blocked = $contextBuilder->blockedTool($aiContext, $primaryTool);
+            $reason = (string) ($blocked['reason'] ?? 'No autorizado.');
+            $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), $primaryTool, 'blocked', $reason, [
+                'route' => $route,
+                'prompt_preview' => substr($prompt, 0, 180),
+            ]);
+
+            return [
+                'answer' => $this->unauthorizedToolResponse($primaryTool, $reason),
+                'tokens' => $this->estimateTokens($prompt),
+                'brain' => $route,
+                'status' => 'blocked',
+            ];
+        }
+        if ($primaryTool !== null) {
+            $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), $primaryTool, 'allowed', null, [
+                'route' => $route,
+            ]);
+        }
+
         $assistant = $repo->assistant((int) $company['id']);
-        $memory = (new MemoryRepository())->search((int) $company['id'], $prompt, 4);
+        $memory = [];
+        if ($contextBuilder->isToolAllowed($aiContext, 'memory.search')) {
+            $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), 'memory.search', 'allowed', null, ['route' => $route['module']]);
+            $memory = (new MemoryRepository())->search((int) $company['id'], $prompt, 4);
+            $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), 'memory.search', 'executed', null, ['hits' => count($memory)]);
+        } elseif ($contextBuilder->blockedTool($aiContext, 'memory.search')) {
+            $blocked = $contextBuilder->blockedTool($aiContext, 'memory.search');
+            $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), 'memory.search', 'blocked', (string) ($blocked['reason'] ?? 'No autorizado.'), ['route' => $route['module']]);
+        }
         $settings = $aiRepo->settings((int) $company['id']);
         $autonomyRepo = new AutonomyRepository();
         $autonomy = $autonomyRepo->profile((int) $company['id']);
@@ -47,6 +80,7 @@ final class AiGateway
                         'assistant' => $assistant,
                         'route' => $route,
                         'memory' => $memory,
+                        'ai_context' => $aiContext,
                     ]);
                     $response = $real['text'];
                     $promptTokens = $real['prompt_tokens'] > 0 ? $real['prompt_tokens'] : $estimatedPromptTokens;
@@ -75,7 +109,7 @@ final class AiGateway
         $totalTokens = $promptTokens + $completionTokens;
         $cost = $this->estimateCost($provider, $model, $promptTokens, $completionTokens);
 
-        if ($route['module'] === 'Asisti Social') {
+        if ($route['module'] === 'Asisti Social' && $contextBuilder->isToolAllowed($aiContext, 'social.generate_campaign')) {
             (new SocialRepository())->generateCampaign((int) $company['id'], [
                 'brief' => $prompt,
                 'product_focus' => 'Producto con buen margen',
@@ -83,9 +117,23 @@ final class AiGateway
                 'quantity' => 10,
                 'channels' => ['Instagram', 'Facebook', 'LinkedIn', 'TikTok', 'WhatsApp'],
             ], $company);
+            $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), 'social.generate_campaign', 'executed', null, [
+                'route' => $route['module'],
+                'posts' => 10,
+            ]);
         }
 
-        $this->createSuggestedAction((int) $company['id'], (int) ($user['id'] ?? 0), $route, $prompt, $autonomy);
+        if ($contextBuilder->isToolAllowed($aiContext, 'action_center.create_suggestion')) {
+            $this->createSuggestedAction((int) $company['id'], (int) ($user['id'] ?? 0), $route, $prompt, $autonomy);
+            $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), 'action_center.create_suggestion', 'executed', null, [
+                'route' => $route['module'],
+            ]);
+        } elseif ($contextBuilder->blockedTool($aiContext, 'action_center.create_suggestion')) {
+            $blocked = $contextBuilder->blockedTool($aiContext, 'action_center.create_suggestion');
+            $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), 'action_center.create_suggestion', 'blocked', (string) ($blocked['reason'] ?? 'No autorizado.'), [
+                'route' => $route['module'],
+            ]);
+        }
         $autonomyRepo->recordSignal((int) $company['id'], 'suggested');
 
         $repo->logAiUsage((int) $company['id'], (int) ($user['id'] ?? 0), $route['module'], $provider, $model, $promptTokens, $completionTokens, $cost, [
@@ -101,6 +149,9 @@ final class AiGateway
                 'configured_model' => $settings['model'],
                 'autonomy_mode' => $autonomy['mode'],
                 'learning_progress' => $autonomy['learning_progress'],
+                'allowed_tools' => array_keys($aiContext['tools']['allowed'] ?? []),
+                'blocked_tools' => array_keys($aiContext['tools']['blocked'] ?? []),
+                'active_abilities' => array_column($aiContext['abilities'] ?? [], 'ability_key'),
             ],
         ]);
 
@@ -124,6 +175,26 @@ final class AiGateway
             : ' No encontre contexto documental relevante en la memoria empresarial.';
 
         return "{$name} enruto la solicitud al {$route['name']}. Entendi: \"{$shortPrompt}\".{$memoryText} En esta fase preparo la ejecucion, separo datos por empresa, registro consumo IA y mantengo aprobacion humana para acciones sensibles.";
+    }
+
+    private function primaryToolForRoute(array $route, string $prompt): ?string
+    {
+        $module = (string) ($route['module'] ?? '');
+        $text = strtolower($prompt);
+
+        return match ($module) {
+            'Asisti Social' => 'social.generate_campaign',
+            'Comercial' => str_contains($text, 'cotizacion') || str_contains($text, 'cotizaciones') ? 'quotes.assist' : 'crm.assist',
+            'Analitica' => 'intelligence.analyze',
+            'Administracion' => 'documents.assist',
+            'Operaciones' => 'omnichannel.assist',
+            default => null,
+        };
+    }
+
+    private function unauthorizedToolResponse(string $toolKey, string $reason): string
+    {
+        return "No tengo autorizacion para usar la herramienta {$toolKey} en esta empresa. {$reason} Puedes pedir al Dueno de empresa o Superadmin que active la habilidad correspondiente en Marketplace o ajuste tus permisos.";
     }
 
     private function memoryPreview(array $memory): string

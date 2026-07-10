@@ -11,6 +11,7 @@ try {
 
     foreach ([
         __DIR__ . '/migrations/022_abilities_marketplace_schema.sql',
+        __DIR__ . '/migrations/023_ai_tool_audit_schema.sql',
         __DIR__ . '/seeders/014_abilities_compatibility.sql',
     ] as $file) {
         $sql = file_get_contents($file);

@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Repositories\AutonomyRepository;
 use App\Repositories\ControlRepository;
+use App\Services\AiToolRegistry;
 use App\Services\AiGateway;
 
 final class ChatController extends Controller
@@ -69,6 +70,23 @@ final class ChatController extends Controller
             return null;
         }
 
+        $toolRegistry = new AiToolRegistry();
+        $decision = $toolRegistry->authorize($this->companyId(), $_SESSION['user'] ?? [], 'controls.create');
+        if (!$decision['allowed']) {
+            $reason = (string) ($decision['reason'] ?? 'No autorizado.');
+            $toolRegistry->audit($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), 'controls.create', 'blocked', $reason, [
+                'prompt_preview' => substr($prompt, 0, 180),
+            ]);
+
+            return [
+                'role' => 'assistant',
+                'content' => 'No tengo autorizacion para crear controles en esta empresa. ' . $reason . ' Pide al Dueno de empresa o Superadmin revisar Marketplace y permisos.',
+                'brain' => 'Cerebro Ejecutivo',
+                'module' => 'Controles',
+                'status' => 'blocked',
+            ];
+        }
+
         $category = 'custom';
         $name = 'Control operativo';
         if (str_contains($normalized, 'gasto')) {
@@ -99,6 +117,11 @@ final class ChatController extends Controller
         if ($id <= 0) {
             return null;
         }
+
+        $toolRegistry->audit($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), 'controls.create', 'executed', null, [
+            'control_id' => $id,
+            'category' => $category,
+        ]);
 
         return [
             'role' => 'assistant',
