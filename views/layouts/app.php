@@ -46,9 +46,9 @@ if ($user) {
                 <i class="bi bi-chevron-down"></i>
             </div>
             <nav class="nav flex-column" data-navigation-source="<?= e($navigationSource) ?>" data-navigation-reason="<?= e($navigationReason) ?>">
-                <?php foreach ($navigation as $section => $items): ?>
+                <?php foreach ($navigation as $section => $navigationItems): ?>
                     <?php
-                    $visibleItems = array_filter($items, fn (array $item): bool => !str_starts_with($item[0], '/admin') || in_array('*', $user['permissions'] ?? [], true));
+                    $visibleItems = array_filter($navigationItems, fn (array $item): bool => !str_starts_with($item[0], '/admin') || in_array('*', $user['permissions'] ?? [], true));
                     if (!$visibleItems) { continue; }
                     ?>
                     <span class="nav-section"><?= e($section) ?></span>
