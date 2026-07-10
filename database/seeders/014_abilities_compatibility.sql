@@ -1,7 +1,7 @@
 INSERT INTO abilities (ability_key, name, commercial_name, category, description, status, is_core, is_default_enabled, sort_order, metadata_json) VALUES
 ('core_workspace', 'Core Workspace', 'Operacion diaria', 'core', 'Dashboard, Mi dia, Bandeja de trabajo y Notificaciones.', 'active', TRUE, TRUE, 10, JSON_OBJECT('phase','compatibility')),
 ('core_ai_assistant', 'Core AI Assistant', 'Asistente inteligente', 'core', 'Chat IA, tareas, automatizaciones, aprobaciones, controles y reglas.', 'active', TRUE, TRUE, 20, JSON_OBJECT('phase','compatibility')),
-('core_omnichannel', 'Core Omnichannel', 'Comunicacion inteligente', 'base', 'Bandeja omnicanal y cuentas conectadas.', 'active', TRUE, FALSE, 30, JSON_OBJECT('phase','compatibility','installable',true)),
+('core_omnichannel', 'Core Omnichannel', 'Comunicacion inteligente', 'base', 'Bandeja omnicanal y cuentas conectadas.', 'active', TRUE, TRUE, 30, JSON_OBJECT('phase','compatibility','core',true)),
 ('core_memory_documents', 'Core Memory Documents', 'Memoria empresarial', 'base', 'Documentos, lectura de archivos, base de conocimiento, catalogos, manuales y entrenamiento.', 'active', TRUE, TRUE, 40, JSON_OBJECT('phase','compatibility')),
 ('core_integrations', 'Core Integrations', 'Integraciones base', 'core', 'Integraciones, APIs y conectores base.', 'active', TRUE, TRUE, 50, JSON_OBJECT('phase','compatibility')),
 ('core_company_admin', 'Core Company Admin', 'Administracion de empresa', 'core', 'Empresa, usuarios, roles, plan y configuracion.', 'active', TRUE, TRUE, 60, JSON_OBJECT('phase','compatibility')),
