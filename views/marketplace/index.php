@@ -18,6 +18,8 @@
             $isActive = $tenantStatus === 'active';
             $isDisabled = $tenantStatus === 'disabled';
             $isProtected = !empty($item['is_protected']);
+            $itemTitle = trim((string) ($item['title'] ?: $item['commercial_name'] ?: $item['ability_name'] ?: $item['ability_key']));
+            $itemDescription = trim((string) ($item['long_description'] ?: $item['short_description'] ?: $item['ability_description'] ?: 'Habilidad modular de AsisFly lista para activar por empresa.'));
             $priceLabel = ($item['pricing_model'] ?? 'included') === 'included'
                 ? 'Incluida'
                 : 'Addon ' . (string) $item['currency'] . ' ' . number_format((float) $item['monthly_price'], 0) . '/mes';
@@ -27,12 +29,12 @@
                 <div class="marketplace-icon"><i class="bi bi-boxes"></i></div>
                 <div>
                     <span class="eyebrow"><?= e((string) $item['category']) ?></span>
-                    <h3><?= e((string) $item['title']) ?></h3>
+                    <h3><?= e($itemTitle) ?></h3>
                 </div>
                 <span class="status status-<?= e($tenantStatus) ?>"><?= e($isActive ? 'Activa' : ($isDisabled ? 'Pausada' : 'Disponible')) ?></span>
             </div>
 
-            <p><?= e((string) ($item['long_description'] ?: $item['short_description'])) ?></p>
+            <p><?= e($itemDescription) ?></p>
 
             <div class="marketplace-meta">
                 <span><i class="bi bi-tag"></i><?= e($priceLabel) ?></span>

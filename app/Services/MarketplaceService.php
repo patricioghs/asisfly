@@ -25,7 +25,11 @@ final class MarketplaceService
             return [];
         }
 
-        $sql = "SELECT mi.*, a.id AS ability_id, a.ability_key, a.category, a.is_core,
+        if ($companyId > 0) {
+            $this->tenantAbilities->ensureDefaultAbilities($companyId);
+        }
+
+        $sql = "SELECT mi.*, a.id AS ability_id, a.ability_key, a.name AS ability_name, a.commercial_name, a.description AS ability_description, a.category, a.is_core,
                        ta.status AS tenant_status,
                        av.version AS installed_version,
                        latest.version AS latest_version
