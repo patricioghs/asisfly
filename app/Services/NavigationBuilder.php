@@ -9,6 +9,9 @@ use PDO;
 
 final class NavigationBuilder
 {
+    private string $source = 'fallback';
+    private string $reason = 'not_built';
+
     public function __construct(
         private ?AbilityRegistry $registry = null,
         private ?TenantAbilityService $tenantAbilities = null,
@@ -24,11 +27,20 @@ final class NavigationBuilder
         $fallback = AbilityRegistry::fallbackNavigation();
 
         try {
+            if (!$this->dynamicNavigationEnabled()) {
+                $this->source = 'fallback';
+                $this->reason = 'disabled_by_env';
+                return $fallback;
+            }
+
             if ($companyId <= 0 || !$this->registry->tablesReady()) {
+                $this->source = 'fallback';
+                $this->reason = $companyId <= 0 ? 'missing_company' : 'ability_tables_not_ready';
                 return $fallback;
             }
 
             $this->tenantAbilities->ensureDefaultAbilities($companyId);
+            $tenantAbilityCount = $this->tenantAbilityCount($companyId);
 
             $statement = Database::connection()->prepare(
                 "SELECT ni.section, ni.label, ni.route, ni.icon, ni.badge_key, ni.permission_key
@@ -47,7 +59,9 @@ final class NavigationBuilder
             $statement->execute(['company_id' => $companyId]);
             $items = $statement->fetchAll(PDO::FETCH_ASSOC);
 
-            if (!$items) {
+            if (!$items && $tenantAbilityCount === 0) {
+                $this->source = 'fallback';
+                $this->reason = 'no_tenant_abilities_seeded';
                 return $fallback;
             }
 
@@ -67,9 +81,39 @@ final class NavigationBuilder
                 ];
             }
 
-            return $navigation ?: $fallback;
+            $this->source = 'dynamic';
+            $this->reason = $navigation ? 'ok' : 'no_visible_items_for_permissions_or_active_abilities';
+
+            return $navigation;
         } catch (\Throwable) {
+            $this->source = 'fallback';
+            $this->reason = 'exception';
             return $fallback;
         }
+    }
+
+    public function source(): string
+    {
+        return $this->source;
+    }
+
+    public function reason(): string
+    {
+        return $this->reason;
+    }
+
+    private function dynamicNavigationEnabled(): bool
+    {
+        $value = strtolower((string) \config('app.dynamic_navigation', 'true'));
+
+        return in_array($value, ['1', 'true', 'yes', 'on'], true);
+    }
+
+    private function tenantAbilityCount(int $companyId): int
+    {
+        $statement = Database::connection()->prepare('SELECT COUNT(*) FROM tenant_abilities WHERE company_id = :company_id');
+        $statement->execute(['company_id' => $companyId]);
+
+        return (int) $statement->fetchColumn();
     }
 }

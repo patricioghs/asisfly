@@ -14,6 +14,10 @@ final class AbilityPermissionResolver
 
         $permissions = $user['permissions'] ?? [];
 
+        if ($permission === '*') {
+            return in_array('*', $permissions, true) || (($user['role'] ?? '') === 'Superadmin');
+        }
+
         return in_array('*', $permissions, true) || in_array($permission, $permissions, true);
     }
 }

@@ -3,11 +3,18 @@ $user = $_SESSION['user'] ?? null;
 $company = $_SESSION['company'] ?? null;
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $navigation = \App\Services\AbilityRegistry::fallbackNavigation();
+$navigationSource = 'fallback';
+$navigationReason = 'initial';
 if ($user) {
     try {
-        $navigation = (new \App\Services\NavigationBuilder())->build((int) ($company['id'] ?? 0), $user);
+        $navigationBuilder = new \App\Services\NavigationBuilder();
+        $navigation = $navigationBuilder->build((int) ($company['id'] ?? 0), $user);
+        $navigationSource = $navigationBuilder->source();
+        $navigationReason = $navigationBuilder->reason();
     } catch (\Throwable) {
         $navigation = \App\Services\AbilityRegistry::fallbackNavigation();
+        $navigationSource = 'fallback';
+        $navigationReason = 'layout_exception';
     }
 }
 ?>
@@ -38,7 +45,7 @@ if ($user) {
                 </div>
                 <i class="bi bi-chevron-down"></i>
             </div>
-            <nav class="nav flex-column">
+            <nav class="nav flex-column" data-navigation-source="<?= e($navigationSource) ?>" data-navigation-reason="<?= e($navigationReason) ?>">
                 <?php foreach ($navigation as $section => $items): ?>
                     <?php
                     $visibleItems = array_filter($items, fn (array $item): bool => !str_starts_with($item[0], '/admin') || in_array('*', $user['permissions'] ?? [], true));
