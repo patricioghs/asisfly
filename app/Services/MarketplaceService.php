@@ -10,6 +10,20 @@ use PDO;
 final class MarketplaceService
 {
     private const PROTECTED_ABILITIES = ['core_workspace', 'core_company_admin', 'core_superadmin'];
+    private const MARKETPLACE_ABILITIES = [
+        'core_workspace',
+        'core_ai_assistant',
+        'core_omnichannel',
+        'core_memory_documents',
+        'core_integrations',
+        'core_company_admin',
+        'core_superadmin',
+        'crm',
+        'quotes',
+        'social_marketing',
+        'intelligence',
+        'ai_brains',
+    ];
 
     public function __construct(
         private ?AbilityRegistry $registry = null,
@@ -29,6 +43,7 @@ final class MarketplaceService
             $this->tenantAbilities->ensureDefaultAbilities($companyId);
         }
 
+        $allowedAbilityKeys = "'" . implode("','", self::MARKETPLACE_ABILITIES) . "'";
         $sql = "SELECT mi.id AS marketplace_id,
                        mi.slug AS marketplace_slug,
                        mi.title AS marketplace_title,
@@ -61,6 +76,7 @@ final class MarketplaceService
                 WHERE mi.status = 'published'
                   AND a.status = 'active'
                   AND TRIM(a.ability_key) <> ''
+                  AND a.ability_key IN ({$allowedAbilityKeys})
                 ORDER BY mi.sort_order, mi.title";
         $statement = Database::connection()->prepare($sql);
         $statement->execute(['company_id' => $companyId]);
