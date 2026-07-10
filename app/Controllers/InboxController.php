@@ -23,7 +23,7 @@ final class InboxController extends Controller
         ];
 
         $this->view('inbox/index', [
-            'title' => 'Bandeja Omnicanal',
+            'title' => 'Centro de Supervision',
             'filters' => $filters,
             'conversations' => $repo->conversations($this->companyId(), $filters),
             'selected' => $repo->selectedConversation($this->companyId(), (int) ($_GET['id'] ?? 0), $filters),

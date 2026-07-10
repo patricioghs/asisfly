@@ -45,7 +45,11 @@ final class InboxRepository
         }
 
         $sql = 'SELECT c.*, a.display_name AS account_name, a.brain_key AS account_brain, a.status AS account_status, u.name AS assigned_name, MAX(m.created_at) AS last_message_at,
-                       SUBSTRING_INDEX(GROUP_CONCAT(m.body ORDER BY m.created_at DESC SEPARATOR "||"), "||", 1) AS last_message
+                       SUBSTRING_INDEX(GROUP_CONCAT(m.body ORDER BY m.created_at DESC SEPARATOR "||"), "||", 1) AS last_message,
+                       MAX(CASE WHEN m.direction = "outbound" AND m.ai_generated = 1 AND m.status = "sent" THEN 1 ELSE 0 END) AS has_ai_sent,
+                       MAX(CASE WHEN m.direction = "outbound" AND m.ai_generated = 1 AND m.status IN ("draft", "approved", "failed") THEN 1 ELSE 0 END) AS has_ai_draft,
+                       SUM(CASE WHEN m.direction = "inbound" THEN 1 ELSE 0 END) AS inbound_count,
+                       SUM(CASE WHEN m.direction = "outbound" THEN 1 ELSE 0 END) AS outbound_count
                 FROM inbox_conversations c
                 LEFT JOIN omnichannel_accounts a ON a.id = c.account_id AND a.company_id = c.company_id
                 LEFT JOIN users u ON u.id = c.assigned_to
@@ -56,7 +60,7 @@ final class InboxRepository
         $statement = Database::connection()->prepare($sql);
         $statement->execute($params);
 
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        return array_map(fn (array $row): array => $this->decorateConversation($row), $statement->fetchAll(PDO::FETCH_ASSOC));
     }
 
     public function selectedConversation(int $companyId, int $id, array $filters = []): ?array
@@ -76,13 +80,20 @@ final class InboxRepository
             return $conversation;
         }
 
-        $statement = Database::connection()->prepare('SELECT c.*, a.display_name AS account_name, a.brain_key AS account_brain, a.status AS account_status, u.name AS assigned_name FROM inbox_conversations c LEFT JOIN omnichannel_accounts a ON a.id = c.account_id AND a.company_id = c.company_id LEFT JOIN users u ON u.id = c.assigned_to WHERE c.company_id = :company_id AND c.id = :id LIMIT 1');
+        $statement = Database::connection()->prepare('SELECT c.*, a.display_name AS account_name, a.brain_key AS account_brain, a.status AS account_status, u.name AS assigned_name,
+            EXISTS(SELECT 1 FROM inbox_messages sm WHERE sm.conversation_id = c.id AND sm.direction = "outbound" AND sm.ai_generated = 1 AND sm.status = "sent" LIMIT 1) AS has_ai_sent,
+            EXISTS(SELECT 1 FROM inbox_messages dm WHERE dm.conversation_id = c.id AND dm.direction = "outbound" AND dm.ai_generated = 1 AND dm.status IN ("draft", "approved", "failed") LIMIT 1) AS has_ai_draft
+            FROM inbox_conversations c
+            LEFT JOIN omnichannel_accounts a ON a.id = c.account_id AND a.company_id = c.company_id
+            LEFT JOIN users u ON u.id = c.assigned_to
+            WHERE c.company_id = :company_id AND c.id = :id LIMIT 1');
         $statement->execute(['company_id' => $companyId, 'id' => $id]);
         $conversation = $statement->fetch(PDO::FETCH_ASSOC);
         if (!$conversation) {
             return null;
         }
 
+        $conversation = $this->decorateConversation($conversation);
         $messages = Database::connection()->prepare('SELECT * FROM inbox_messages WHERE company_id = :company_id AND conversation_id = :conversation_id ORDER BY created_at');
         $messages->execute(['company_id' => $companyId, 'conversation_id' => $id]);
         $conversation['messages'] = $messages->fetchAll(PDO::FETCH_ASSOC);
@@ -107,13 +118,21 @@ final class InboxRepository
     public function metrics(int $companyId): array
     {
         $conversations = $this->conversations($companyId);
-        $count = fn (string $status): int => count(array_filter($conversations, fn (array $conversation) => $conversation['status'] === $status));
+        $countState = fn (string $state): int => count(array_filter($conversations, fn (array $conversation) => ($conversation['ai_state'] ?? '') === $state));
+        $received = count($conversations);
+        $aiResolved = $countState('ai_resolved');
+        $humanRequired = $countState('human_required');
+        $approvalRequired = $countState('approval_required');
+        $autonomy = $received > 0 ? (string) round(($aiResolved / $received) * 100) . '%' : '0%';
+        $savedMinutes = $aiResolved * 4;
 
         return [
-            ['label' => 'Nuevas', 'value' => (string) $count('new')],
-            ['label' => 'En aprobacion', 'value' => (string) $count('pending_approval')],
-            ['label' => 'Abiertas', 'value' => (string) $count('open')],
-            ['label' => 'Respondidas', 'value' => (string) $count('answered')],
+            ['label' => 'Recibidas', 'value' => (string) $received],
+            ['label' => 'Resueltas por IA', 'value' => (string) $aiResolved],
+            ['label' => 'Por aprobar', 'value' => (string) $approvalRequired],
+            ['label' => 'Requieren humano', 'value' => (string) $humanRequired],
+            ['label' => 'Tiempo ahorrado', 'value' => $savedMinutes . ' min'],
+            ['label' => 'Autonomia', 'value' => $autonomy],
         ];
     }
 
@@ -300,6 +319,77 @@ final class InboxRepository
         return $row ?: null;
     }
 
+    private function decorateConversation(array $conversation): array
+    {
+        $status = (string) ($conversation['status'] ?? 'new');
+        $priority = (string) ($conversation['priority'] ?? 'medium');
+        $hasAiSent = !empty($conversation['has_ai_sent']);
+        $hasAiDraft = !empty($conversation['has_ai_draft']);
+        $assigned = !empty($conversation['assigned_to']) || !empty($conversation['assigned_name']);
+
+        $state = match ($status) {
+            'answered' => $hasAiSent ? 'ai_resolved' : 'human_answered',
+            'pending_approval' => 'approval_required',
+            'open' => $assigned ? 'human_reviewing' : 'human_required',
+            'closed' => 'closed',
+            default => 'human_required',
+        };
+
+        if ($status === 'new' && $hasAiDraft) {
+            $state = 'approval_required';
+        }
+
+        $labels = [
+            'ai_resolved' => 'Resuelta por IA',
+            'approval_required' => 'Requiere aprobacion',
+            'human_required' => 'Requiere humano',
+            'human_reviewing' => 'En revision humana',
+            'human_answered' => 'Respondida por humano',
+            'closed' => 'Cerrada',
+        ];
+
+        $activities = [
+            'ai_resolved' => 'IA respondio automaticamente',
+            'approval_required' => 'IA preparo una respuesta para revisar',
+            'human_required' => 'IA necesita apoyo humano',
+            'human_reviewing' => 'Humano esta revisando',
+            'human_answered' => 'Humano respondio la conversacion',
+            'closed' => 'Conversacion cerrada',
+        ];
+
+        $reasons = [
+            'ai_resolved' => 'La conversacion ya fue atendida y queda auditada en el historial.',
+            'approval_required' => 'Hay una respuesta lista, pero requiere aprobacion antes de enviarse.',
+            'human_required' => 'AsisFly necesita mas contexto, autorizacion o una decision comercial.',
+            'human_reviewing' => 'La conversacion fue tomada por una persona del equipo.',
+            'human_answered' => 'La ultima gestion fue realizada manualmente por el equipo.',
+            'closed' => 'No requiere nuevas acciones por ahora.',
+        ];
+
+        $confidence = match ($state) {
+            'ai_resolved' => 92,
+            'approval_required' => 76,
+            'human_reviewing' => 68,
+            'human_answered' => 64,
+            'closed' => 100,
+            default => $priority === 'critical' || $priority === 'high' ? 48 : 55,
+        };
+
+        $customer = (string) ($conversation['customer_name'] ?? 'cliente');
+        $subject = (string) ($conversation['subject'] ?? 'conversacion');
+        $channel = (string) (($conversation['account_name'] ?? '') ?: ($conversation['channel'] ?? 'canal'));
+
+        $conversation['ai_state'] = $state;
+        $conversation['ai_state_label'] = $labels[$state] ?? 'Requiere supervision';
+        $conversation['ai_activity'] = $activities[$state] ?? 'AsisFly reviso la conversacion';
+        $conversation['ai_reason'] = $reasons[$state] ?? 'AsisFly dejo la conversacion en supervision.';
+        $conversation['ai_confidence'] = $confidence;
+        $conversation['ai_summary'] = "Conversacion con {$customer} sobre {$subject} desde {$channel}.";
+        $conversation['requires_human'] = in_array($state, ['approval_required', 'human_required', 'human_reviewing'], true);
+
+        return $conversation;
+    }
+
     private function draftReply(array $conversation, string $lastMessage): string
     {
         $name = $conversation['customer_name'] ?? 'cliente';
@@ -308,9 +398,7 @@ final class InboxRepository
 
     private function fallbackConversations(): array
     {
-        return [
-            ['id' => 1, 'channel' => 'WhatsApp', 'account_name' => 'WhatsApp Ventas', 'customer_name' => 'Valentina Rojas', 'subject' => 'Consulta por cotizacion', 'status' => 'new', 'priority' => 'high', 'last_message' => 'Hola, quiero saber precios y despacho.'],
-        ];
+        return [];
     }
 
     private function fallbackMessages(): array
