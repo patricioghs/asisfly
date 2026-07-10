@@ -124,12 +124,12 @@ final class AiGateway
             ]);
         }
 
-        if ($contextBuilder->isToolAllowed($aiContext, 'action_center.create_suggestion')) {
+        if ($this->shouldCreateSuggestedAction($route, $prompt) && $contextBuilder->isToolAllowed($aiContext, 'action_center.create_suggestion')) {
             $this->createSuggestedAction((int) $company['id'], (int) ($user['id'] ?? 0), $route, $prompt, $autonomy);
             $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), 'action_center.create_suggestion', 'executed', null, [
                 'route' => $route['module'],
             ]);
-        } elseif ($contextBuilder->blockedTool($aiContext, 'action_center.create_suggestion')) {
+        } elseif ($this->shouldCreateSuggestedAction($route, $prompt) && $contextBuilder->blockedTool($aiContext, 'action_center.create_suggestion')) {
             $blocked = $contextBuilder->blockedTool($aiContext, 'action_center.create_suggestion');
             $toolRegistry->audit((int) $company['id'], (int) ($user['id'] ?? 0), 'action_center.create_suggestion', 'blocked', (string) ($blocked['reason'] ?? 'No autorizado.'), [
                 'route' => $route['module'],
@@ -278,6 +278,99 @@ final class AiGateway
                 'approval_policy' => $requiresApproval ? 'Requiere aprobacion humana' : 'Puede ejecutarse segun reglas de bajo riesgo',
             ],
         ]);
+    }
+
+    private function shouldCreateSuggestedAction(array $route, string $prompt): bool
+    {
+        $text = $this->normalizeText($prompt);
+        $module = (string) ($route['module'] ?? '');
+
+        $actionPatterns = [
+            'envia',
+            'enviar',
+            'responde',
+            'responder',
+            'manda',
+            'mandar',
+            'publica',
+            'publicar',
+            'programa',
+            'programar',
+            'agenda',
+            'agendar',
+            'crea cotizacion',
+            'crear cotizacion',
+            'genera cotizacion',
+            'generar cotizacion',
+            'crea tarea',
+            'crear tarea',
+            'crea cliente',
+            'crear cliente',
+            'crea oportunidad',
+            'crear oportunidad',
+            'haz seguimiento',
+            'hacer seguimiento',
+            'recupera',
+            'recuperar',
+            'archiva',
+            'archivar',
+            'etiqueta',
+            'etiquetar',
+            'ejecuta',
+            'ejecutar',
+            'automatiza',
+            'automatizar',
+            'aprueba',
+            'aprobar',
+            'cancela',
+            'cancelar',
+            'reagenda',
+            'reagendar',
+        ];
+
+        foreach ($actionPatterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+
+        if ($module === 'Asisti Social' && (str_contains($text, 'crea') || str_contains($text, 'genera'))) {
+            return true;
+        }
+
+        $informationalPatterns = [
+            'que tenemos hoy',
+            'qué tenemos hoy',
+            'que hay hoy',
+            'resumen',
+            'informe',
+            'estado',
+            'cuentame',
+            'explícame',
+            'explicame',
+            'como funciona',
+            'qué puedes',
+            'que puedes',
+            'ayuda',
+            'revisame',
+            'revísame',
+            'analiza',
+            'analizar',
+        ];
+
+        foreach ($informationalPatterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizeText(string $text): string
+    {
+        $text = function_exists('mb_strtolower') ? mb_strtolower(trim($text), 'UTF-8') : strtolower(trim($text));
+        return str_replace(['?', '¿', '.', ',', '!', '¡'], '', $text);
     }
 
 }
