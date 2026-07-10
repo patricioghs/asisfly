@@ -3,6 +3,11 @@ $typeLabels = ['approval' => 'Aprobaciones', 'task' => 'Tareas', 'control' => 'C
 $statusLabels = ['unread' => 'No leida', 'pending' => 'Pendiente', 'read' => 'Leida', 'resolved' => 'Resuelta'];
 $priorityLabels = ['critical' => 'Critica', 'high' => 'Alta', 'medium' => 'Media', 'low' => 'Baja'];
 $riskLabels = ['high' => 'Riesgo alto', 'medium' => 'Riesgo medio', 'low' => 'Riesgo bajo'];
+$filterFields = function () use ($filters): void { ?>
+    <input type="hidden" name="filter_type" value="<?= e((string) ($filters['type'] ?? '')) ?>">
+    <input type="hidden" name="filter_status" value="<?= e((string) ($filters['status'] ?? '')) ?>">
+    <input type="hidden" name="filter_q" value="<?= e((string) ($filters['q'] ?? '')) ?>">
+<?php };
 ?>
 
 <section class="panel notifications-hero">
@@ -15,6 +20,14 @@ $riskLabels = ['high' => 'Riesgo alto', 'medium' => 'Riesgo medio', 'low' => 'Ri
         <span>Conectado a modulos</span>
         <strong><?= e((string) count($notifications)) ?> novedades</strong>
         <p>Ordenadas por prioridad, riesgo y fecha de actualizacion.</p>
+        <?php if ($notifications): ?>
+            <form method="post" action="<?= url('/notifications/all-reviewed') ?>" class="workbench-inline-form">
+                <?= csrf_field() ?>
+                <?php $filterFields(); ?>
+                <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-check2-all"></i> Marcar todas revisadas</button>
+                <small>Oculta estas alertas del centro sin borrar su origen.</small>
+            </form>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -37,7 +50,7 @@ $riskLabels = ['high' => 'Riesgo alto', 'medium' => 'Riesgo medio', 'low' => 'Ri
         <?php endforeach; ?>
     </select>
     <select class="form-select" name="status">
-        <option value="">Todos los estados</option>
+        <option value="">Pendientes / no revisadas</option>
         <?php foreach ($statusLabels as $value => $label): ?>
             <option value="<?= e($value) ?>" <?= ($filters['status'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
         <?php endforeach; ?>
@@ -81,6 +94,14 @@ $riskLabels = ['high' => 'Riesgo alto', 'medium' => 'Riesgo medio', 'low' => 'Ri
                     </div>
                     <div class="notification-actions">
                         <a class="btn btn-sm btn-outline-primary" href="<?= url((string) ($notification['action_url'] ?? '/notifications')) ?>"><?= e((string) ($notification['action_label'] ?? 'Abrir')) ?> <i class="bi bi-arrow-right"></i></a>
+                        <?php if ($status !== 'read'): ?>
+                            <form method="post" action="<?= url('/notifications/reviewed') ?>">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="notification_id" value="<?= e((string) ($notification['id'] ?? '')) ?>">
+                                <?php $filterFields(); ?>
+                                <button class="btn btn-sm btn-light" type="submit"><i class="bi bi-check2"></i>Revisada</button>
+                            </form>
+                        <?php endif; ?>
                     </div>
                 </article>
             <?php endforeach; ?>

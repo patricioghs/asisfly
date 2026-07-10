@@ -44,6 +44,8 @@ $router->post('/workbench/task-done', [HomeController::class, 'completeWorkbench
 $router->post('/workbench/message-reviewed', [HomeController::class, 'markWorkbenchMessageReviewed']);
 $router->post('/workbench/emails-reviewed', [HomeController::class, 'markWorkbenchEmailsReviewed']);
 $router->get('/notifications', [HomeController::class, 'notifications']);
+$router->post('/notifications/reviewed', [HomeController::class, 'markNotificationReviewed']);
+$router->post('/notifications/all-reviewed', [HomeController::class, 'markNotificationsReviewed']);
 $router->get('/mvp', [MvpController::class, 'index']);
 $router->get('/actions', [ActionController::class, 'index']);
 $router->post('/actions/approve', [ActionController::class, 'approve']);

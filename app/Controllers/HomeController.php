@@ -128,6 +128,39 @@ final class HomeController extends Controller
         ]);
     }
 
+    public function markNotificationReviewed(): void
+    {
+        $this->requireAuth();
+
+        $notificationId = trim((string) ($_POST['notification_id'] ?? ''));
+        if ($notificationId !== '' && Database::available()) {
+            $this->markNotificationIdsReviewed($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), [$notificationId]);
+        }
+
+        $this->redirect('/notifications' . $this->notificationFilterQuery($_POST));
+    }
+
+    public function markNotificationsReviewed(): void
+    {
+        $this->requireAuth();
+
+        if (Database::available()) {
+            $filters = [
+                'type' => trim((string) ($_POST['filter_type'] ?? '')),
+                'status' => trim((string) ($_POST['filter_status'] ?? '')),
+                'q' => trim((string) ($_POST['filter_q'] ?? '')),
+            ];
+            $notifications = $this->notificationItems($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $filters);
+            $this->markNotificationIdsReviewed(
+                $this->companyId(),
+                (int) ($_SESSION['user']['id'] ?? 0),
+                array_map(fn (array $item): string => (string) ($item['id'] ?? ''), $notifications)
+            );
+        }
+
+        $this->redirect('/notifications' . $this->notificationFilterQuery($_POST));
+    }
+
     private function notificationItems(int $companyId, int $userId, array $filters): array
     {
         if (!Database::available()) {
@@ -142,7 +175,19 @@ final class HomeController extends Controller
             ...$this->quoteNotifications($companyId),
         ];
         $items = array_map(fn (array $item): array => $this->normalizeNotification($item), $items);
+        $reviewed = $this->notificationReviewMap($companyId, $userId);
+        $items = array_map(function (array $item) use ($reviewed): array {
+            if (isset($reviewed[$item['id']])) {
+                $item['status'] = 'read';
+                $item['reviewed_at'] = $reviewed[$item['id']];
+            }
+
+            return $item;
+        }, $items);
         $items = array_values(array_filter($items, function (array $item) use ($filters): bool {
+            if (($filters['status'] ?? '') === '' && $item['status'] === 'read') {
+                return false;
+            }
             if (($filters['type'] ?? '') !== '' && $item['type'] !== $filters['type']) {
                 return false;
             }
@@ -158,6 +203,106 @@ final class HomeController extends Controller
 
         usort($items, fn (array $a, array $b): int => [$this->priorityWeight($b['priority']), $b['sort_at']] <=> [$this->priorityWeight($a['priority']), $a['sort_at']]);
         return array_slice($items, 0, 60);
+    }
+
+    private function markNotificationIdsReviewed(int $companyId, int $userId, array $ids): void
+    {
+        $ids = array_values(array_unique(array_filter(array_map(
+            fn (string $id): string => preg_match('/^[a-z]+-\d+$/', $id) ? $id : '',
+            $ids
+        ))));
+        if ($ids === [] || !$this->ensureNotificationReviewsTable()) {
+            return;
+        }
+
+        $statement = Database::connection()->prepare(
+            'INSERT INTO notification_reviews (company_id, user_id, source_key, reviewed_at)
+             VALUES (:company_id, :user_id, :source_key, CURRENT_TIMESTAMP)
+             ON DUPLICATE KEY UPDATE reviewed_at = CURRENT_TIMESTAMP'
+        );
+
+        foreach ($ids as $id) {
+            $statement->execute([
+                'company_id' => $companyId,
+                'user_id' => $userId,
+                'source_key' => $id,
+            ]);
+            $this->markNotificationSourceRead($companyId, $userId, $id);
+        }
+    }
+
+    private function markNotificationSourceRead(int $companyId, int $userId, string $id): void
+    {
+        [$type, $rawId] = array_pad(explode('-', $id, 2), 2, '');
+        $sourceId = (int) $rawId;
+        if ($sourceId <= 0) {
+            return;
+        }
+
+        if ($type === 'action' && $this->tableExists('action_center_notifications')) {
+            Database::connection()->prepare(
+                'UPDATE action_center_notifications SET status = "read", read_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id AND (user_id = :user_id OR user_id IS NULL)'
+            )->execute(['company_id' => $companyId, 'id' => $sourceId, 'user_id' => $userId]);
+        }
+
+        if ($type === 'task' && $this->tableExists('crm_task_notifications')) {
+            Database::connection()->prepare(
+                'UPDATE crm_task_notifications SET status = "read", read_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id AND (user_id = :user_id OR user_id IS NULL)'
+            )->execute(['company_id' => $companyId, 'id' => $sourceId, 'user_id' => $userId]);
+        }
+    }
+
+    private function notificationReviewMap(int $companyId, int $userId): array
+    {
+        if (!$this->ensureNotificationReviewsTable()) {
+            return [];
+        }
+
+        $statement = Database::connection()->prepare('SELECT source_key, reviewed_at FROM notification_reviews WHERE company_id = :company_id AND user_id = :user_id');
+        $statement->execute(['company_id' => $companyId, 'user_id' => $userId]);
+
+        $map = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $map[(string) $row['source_key']] = (string) $row['reviewed_at'];
+        }
+
+        return $map;
+    }
+
+    private function ensureNotificationReviewsTable(): bool
+    {
+        static $ready = null;
+        if ($ready !== null) {
+            return $ready;
+        }
+
+        try {
+            Database::connection()->exec(
+                'CREATE TABLE IF NOT EXISTS notification_reviews (
+                    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    company_id BIGINT UNSIGNED NOT NULL,
+                    user_id BIGINT UNSIGNED NOT NULL,
+                    source_key VARCHAR(80) NOT NULL,
+                    reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_notification_review_user_source (company_id, user_id, source_key),
+                    INDEX idx_notification_reviews_user (company_id, user_id, reviewed_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+            );
+            return $ready = true;
+        } catch (\Throwable) {
+            return $ready = false;
+        }
+    }
+
+    private function notificationFilterQuery(array $source): string
+    {
+        $query = http_build_query(array_filter([
+            'type' => $source['filter_type'] ?? null,
+            'status' => $source['filter_status'] ?? null,
+            'q' => $source['filter_q'] ?? null,
+        ], fn ($value) => $value !== null && $value !== ''));
+
+        return $query ? '?' . $query : '';
     }
 
     private function actionNotifications(int $companyId, int $userId): array

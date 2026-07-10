@@ -1607,7 +1607,17 @@ a {
 
 .notification-actions {
   display: grid;
+  gap: 8px;
   justify-items: end;
+}
+
+.notification-actions form,
+.notification-actions .btn {
+  width: 100%;
+}
+
+.notification-actions .btn {
+  justify-content: center;
 }
 
 .notification-rule {
