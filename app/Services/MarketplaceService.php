@@ -10,19 +10,19 @@ use PDO;
 final class MarketplaceService
 {
     private const PROTECTED_ABILITIES = ['core_workspace', 'core_company_admin', 'core_superadmin'];
-    private const MARKETPLACE_ABILITIES = [
-        'core_workspace',
-        'core_ai_assistant',
-        'core_omnichannel',
-        'core_memory_documents',
-        'core_integrations',
-        'core_company_admin',
-        'core_superadmin',
-        'crm',
-        'quotes',
-        'social_marketing',
-        'intelligence',
-        'ai_brains',
+    private const CATALOG = [
+        'core_workspace' => ['name' => 'Core Workspace', 'label' => 'Operacion diaria', 'category' => 'core', 'description' => 'Dashboard, Mi dia, Bandeja de trabajo y Notificaciones para operar cada jornada.', 'is_core' => true, 'default' => true, 'sort' => 10],
+        'core_ai_assistant' => ['name' => 'Core AI Assistant', 'label' => 'Asistente inteligente', 'category' => 'core', 'description' => 'Chat IA, tareas, automatizaciones, aprobaciones, controles y reglas del asistente.', 'is_core' => true, 'default' => true, 'sort' => 20],
+        'core_omnichannel' => ['name' => 'Core Omnichannel', 'label' => 'Comunicacion inteligente', 'category' => 'base', 'description' => 'Bandeja omnicanal y cuentas conectadas para centralizar correos y mensajes.', 'is_core' => true, 'default' => false, 'sort' => 30],
+        'core_memory_documents' => ['name' => 'Core Memory Documents', 'label' => 'Memoria empresarial', 'category' => 'base', 'description' => 'Documentos, base de conocimiento, catalogos, manuales y entrenamiento empresarial.', 'is_core' => true, 'default' => true, 'sort' => 40],
+        'core_integrations' => ['name' => 'Core Integrations', 'label' => 'Integraciones base', 'category' => 'core', 'description' => 'Integraciones, APIs y conectores base para conectar AsisFly con otras plataformas.', 'is_core' => true, 'default' => true, 'sort' => 50],
+        'core_company_admin' => ['name' => 'Core Company Admin', 'label' => 'Administracion de empresa', 'category' => 'core', 'description' => 'Empresa, usuarios, roles, plan, facturacion y configuracion general.', 'is_core' => true, 'default' => true, 'sort' => 60],
+        'core_superadmin' => ['name' => 'Core Superadmin', 'label' => 'Administracion global', 'category' => 'core', 'description' => 'Panel global para administrar empresas, planes, consumo IA, auditoria y estado del sistema.', 'is_core' => true, 'default' => true, 'sort' => 70],
+        'crm' => ['name' => 'CRM', 'label' => 'CRM comercial', 'category' => 'professional', 'description' => 'Clientes, contactos, oportunidades, tareas, notas y seguimiento comercial.', 'is_core' => false, 'default' => false, 'sort' => 100],
+        'quotes' => ['name' => 'Quotes', 'label' => 'Cotizaciones', 'category' => 'professional', 'description' => 'Cotizaciones, productos, impuestos, descuentos, estados y envio comercial.', 'is_core' => false, 'default' => false, 'sort' => 110],
+        'social_marketing' => ['name' => 'Social Marketing', 'label' => 'Asisti Social', 'category' => 'professional', 'description' => 'Calendario editorial, ideas, copies, campanas, hashtags y publicaciones por canal.', 'is_core' => false, 'default' => false, 'sort' => 120],
+        'intelligence' => ['name' => 'Business Intelligence', 'label' => 'Inteligencia empresarial', 'category' => 'professional', 'description' => 'Reportes, analytics, dashboards, Excel, indicadores, KPIs y analisis de negocio.', 'is_core' => false, 'default' => false, 'sort' => 130],
+        'ai_brains' => ['name' => 'AI Brains', 'label' => 'Cerebros IA', 'category' => 'base', 'description' => 'Cerebros comercial, administrativo, analitico, operacional y ejecutivo por empresa.', 'is_core' => true, 'default' => true, 'sort' => 140],
     ];
 
     public function __construct(
@@ -39,20 +39,22 @@ final class MarketplaceService
             return [];
         }
 
+        $this->ensureCanonicalCatalog();
+
         if ($companyId > 0) {
             $this->tenantAbilities->ensureDefaultAbilities($companyId);
         }
 
-        $allowedAbilityKeys = "'" . implode("','", self::MARKETPLACE_ABILITIES) . "'";
+        $allowedAbilityKeys = "'" . implode("','", array_keys(self::CATALOG)) . "'";
         $sql = "SELECT mi.id AS marketplace_id,
-                       mi.slug AS marketplace_slug,
-                       mi.title AS marketplace_title,
-                       mi.short_description,
-                       mi.long_description,
-                       mi.pricing_model,
-                       mi.monthly_price,
-                       mi.currency,
-                       mi.sort_order AS marketplace_sort_order,
+                       COALESCE(mi.slug, a.ability_key) AS marketplace_slug,
+                       COALESCE(mi.title, a.commercial_name) AS marketplace_title,
+                       COALESCE(mi.short_description, LEFT(a.description, 255)) AS short_description,
+                       COALESCE(mi.long_description, a.description) AS long_description,
+                       COALESCE(mi.pricing_model, IF(a.category IN ('core','base'), 'included', 'addon')) AS pricing_model,
+                       COALESCE(mi.monthly_price, 0) AS monthly_price,
+                       COALESCE(mi.currency, 'USD') AS currency,
+                       COALESCE(mi.sort_order, a.sort_order) AS marketplace_sort_order,
                        a.id AS ability_id,
                        a.ability_key AS resolved_ability_key,
                        a.name AS ability_name,
@@ -63,8 +65,8 @@ final class MarketplaceService
                        ta.status AS tenant_status,
                        av.version AS installed_version,
                        latest.version AS latest_version
-                FROM marketplace_items mi
-                INNER JOIN abilities a ON a.id = mi.ability_id
+                FROM abilities a
+                LEFT JOIN marketplace_items mi ON mi.ability_id = a.id AND mi.slug = a.ability_key
                 LEFT JOIN tenant_abilities ta ON ta.ability_id = a.id AND ta.company_id = :company_id
                 LEFT JOIN ability_versions av ON av.id = ta.ability_version_id
                 LEFT JOIN (
@@ -73,11 +75,10 @@ final class MarketplaceService
                     WHERE status = 'stable'
                     GROUP BY ability_id
                 ) latest ON latest.ability_id = a.id
-                WHERE mi.status = 'published'
-                  AND a.status = 'active'
+                WHERE a.status = 'active'
                   AND TRIM(a.ability_key) <> ''
                   AND a.ability_key IN ({$allowedAbilityKeys})
-                ORDER BY mi.sort_order, mi.title";
+                ORDER BY a.sort_order, a.commercial_name";
         $statement = Database::connection()->prepare($sql);
         $statement->execute(['company_id' => $companyId]);
 
@@ -98,6 +99,8 @@ final class MarketplaceService
         if ($companyId <= 0 || !$this->registry->tablesReady()) {
             return ['ok' => false, 'message' => 'No se pudo acceder al registro de habilidades.'];
         }
+
+        $this->ensureCanonicalCatalog();
 
         $ability = $this->resolveAbility($abilityKey);
         if (!$ability) {
@@ -132,12 +135,18 @@ final class MarketplaceService
 
     public function disable(int $companyId, string $abilityKey, ?int $userId = null): array
     {
+        $this->ensureCanonicalCatalog();
+
         $ability = $this->resolveAbility($abilityKey);
         if (!$ability) {
             return ['ok' => false, 'message' => 'La habilidad seleccionada no existe.'];
         }
 
         $resolvedKey = (string) $ability['ability_key'];
+        if (!isset(self::CATALOG[$resolvedKey])) {
+            return ['ok' => false, 'message' => 'La habilidad seleccionada no forma parte del catalogo oficial.'];
+        }
+
         if (in_array($resolvedKey, self::PROTECTED_ABILITIES, true)) {
             return ['ok' => false, 'message' => 'Esta habilidad es critica para operar AsisFly y no se puede desactivar desde Marketplace.'];
         }
@@ -188,7 +197,7 @@ final class MarketplaceService
             $statement = Database::connection()->prepare('SELECT * FROM abilities WHERE id = :id LIMIT 1');
             $statement->execute(['id' => (int) $key]);
             $row = $statement->fetch(PDO::FETCH_ASSOC);
-            if ($row) {
+            if ($row && isset(self::CATALOG[(string) $row['ability_key']])) {
                 return $row;
             }
 
@@ -201,7 +210,7 @@ final class MarketplaceService
             );
             $statement->execute(['id' => (int) $key]);
             $row = $statement->fetch(PDO::FETCH_ASSOC);
-            if ($row) {
+            if ($row && isset(self::CATALOG[(string) $row['ability_key']])) {
                 return $row;
             }
         }
@@ -216,7 +225,69 @@ final class MarketplaceService
         $statement->execute(['slug' => $key]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
 
-        return $row ?: null;
+        return ($row && isset(self::CATALOG[(string) $row['ability_key']])) ? $row : null;
+    }
+
+    private function ensureCanonicalCatalog(): void
+    {
+        $pdo = Database::connection();
+        $abilityStatement = $pdo->prepare(
+            "INSERT INTO abilities (ability_key, name, commercial_name, category, description, status, is_core, is_default_enabled, sort_order, metadata_json)
+             VALUES (:ability_key, :name, :commercial_name, :category, :description, 'active', :is_core, :is_default_enabled, :sort_order, JSON_OBJECT('source','canonical_catalog'))
+             ON DUPLICATE KEY UPDATE
+               name = VALUES(name),
+               commercial_name = VALUES(commercial_name),
+               category = VALUES(category),
+               description = VALUES(description),
+               status = 'active',
+               is_core = VALUES(is_core),
+               is_default_enabled = VALUES(is_default_enabled),
+               sort_order = VALUES(sort_order)"
+        );
+        $versionStatement = $pdo->prepare(
+            "INSERT INTO ability_versions (ability_id, version, status, manifest_json, released_at)
+             SELECT id, '1.0.0', 'stable', JSON_OBJECT('canonical', TRUE), NOW()
+             FROM abilities
+             WHERE ability_key = :ability_key
+             ON DUPLICATE KEY UPDATE status = 'stable'"
+        );
+        $marketplaceStatement = $pdo->prepare(
+            "INSERT INTO marketplace_items (ability_id, slug, title, short_description, long_description, pricing_model, monthly_price, currency, status, sort_order, metadata_json)
+             SELECT id, :slug, :title, :short_description, :long_description, :pricing_model, 0, 'USD', 'published', :sort_order, JSON_OBJECT('source','canonical_catalog')
+             FROM abilities
+             WHERE ability_key = :ability_key
+             ON DUPLICATE KEY UPDATE
+               ability_id = VALUES(ability_id),
+               title = VALUES(title),
+               short_description = VALUES(short_description),
+               long_description = VALUES(long_description),
+               pricing_model = VALUES(pricing_model),
+               status = 'published',
+               sort_order = VALUES(sort_order)"
+        );
+
+        foreach (self::CATALOG as $key => $definition) {
+            $abilityStatement->execute([
+                'ability_key' => $key,
+                'name' => $definition['name'],
+                'commercial_name' => $definition['label'],
+                'category' => $definition['category'],
+                'description' => $definition['description'],
+                'is_core' => $definition['is_core'] ? 1 : 0,
+                'is_default_enabled' => $definition['default'] ? 1 : 0,
+                'sort_order' => $definition['sort'],
+            ]);
+            $versionStatement->execute(['ability_key' => $key]);
+            $marketplaceStatement->execute([
+                'ability_key' => $key,
+                'slug' => $key,
+                'title' => $definition['label'],
+                'short_description' => substr($definition['description'], 0, 255),
+                'long_description' => $definition['description'],
+                'pricing_model' => in_array($definition['category'], ['core', 'base'], true) ? 'included' : 'addon',
+                'sort_order' => $definition['sort'],
+            ]);
+        }
     }
 
     private function displayTitle(array $item): string
@@ -257,42 +328,12 @@ final class MarketplaceService
 
     public static function abilityLabel(string $abilityKey): string
     {
-        $labels = [
-            'core_workspace' => 'Operacion diaria',
-            'core_ai_assistant' => 'Asistente inteligente',
-            'core_omnichannel' => 'Comunicacion inteligente',
-            'core_memory_documents' => 'Memoria empresarial',
-            'core_integrations' => 'Integraciones base',
-            'core_company_admin' => 'Administracion de empresa',
-            'core_superadmin' => 'Administracion global',
-            'crm' => 'CRM comercial',
-            'quotes' => 'Cotizaciones',
-            'social_marketing' => 'Asisti Social',
-            'intelligence' => 'Inteligencia empresarial',
-            'ai_brains' => 'Cerebros IA',
-        ];
-
-        return $labels[$abilityKey] ?? '';
+        return (string) (self::CATALOG[$abilityKey]['label'] ?? '');
     }
 
     public static function abilityDescription(string $abilityKey): string
     {
-        $descriptions = [
-            'core_workspace' => 'Dashboard, Mi dia, Bandeja de trabajo y Notificaciones para operar cada jornada.',
-            'core_ai_assistant' => 'Chat IA, tareas, automatizaciones, aprobaciones, controles y reglas del asistente.',
-            'core_omnichannel' => 'Bandeja omnicanal y cuentas conectadas para centralizar correos y mensajes.',
-            'core_memory_documents' => 'Documentos, base de conocimiento, catalogos, manuales y entrenamiento empresarial.',
-            'core_integrations' => 'Integraciones, APIs y conectores base para conectar AsisFly con otras plataformas.',
-            'core_company_admin' => 'Empresa, usuarios, roles, plan, facturacion y configuracion general.',
-            'core_superadmin' => 'Panel global para administrar empresas, planes, consumo IA, auditoria y estado del sistema.',
-            'crm' => 'Clientes, contactos, oportunidades, tareas, notas y seguimiento comercial.',
-            'quotes' => 'Cotizaciones, productos, impuestos, descuentos, estados y envio comercial.',
-            'social_marketing' => 'Calendario editorial, ideas, copies, campanas, hashtags y publicaciones por canal.',
-            'intelligence' => 'Reportes, analytics, dashboards, Excel, indicadores, KPIs y analisis de negocio.',
-            'ai_brains' => 'Cerebros comercial, administrativo, analitico, operacional y ejecutivo por empresa.',
-        ];
-
-        return $descriptions[$abilityKey] ?? '';
+        return (string) (self::CATALOG[$abilityKey]['description'] ?? '');
     }
 
     private function missingRequiredDependencies(int $abilityId, int $companyId): array
