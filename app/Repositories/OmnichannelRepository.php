@@ -8,6 +8,7 @@ use App\Core\Database;
 use App\Repositories\ActionRepository;
 use App\Repositories\AutonomyRepository;
 use App\Services\ConnectionTester;
+use App\Services\OmnichannelAiResponder;
 use App\Services\SecretVault;
 use App\Services\SmtpMailer;
 use PDO;
@@ -695,7 +696,6 @@ final class OmnichannelRepository
     {
         $autonomy = (new AutonomyRepository())->profile($companyId);
         $decision = $this->automationDecision($account, $message, $autonomy);
-        $draft = $this->draftSupervisedReply($account, $message, $decision);
 
         if ($decision['mode'] === 'human_required') {
             Database::connection()->prepare('UPDATE inbox_conversations SET status = "open", assigned_to = :assigned_to, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
@@ -711,6 +711,8 @@ final class OmnichannelRepository
             return ['mode' => 'human_required', 'message' => 'AsisFly derivo la conversacion a supervision humana.'];
         }
 
+        $aiDraft = (new OmnichannelAiResponder())->draft($companyId, $account, $message, $decision, $this->conversationHistory($companyId, $conversationId));
+        $draft = (string) $aiDraft['body'];
         $draftId = $this->insertAiDraft($companyId, $conversationId, $account, $draft);
 
         if ($decision['mode'] === 'approval_required') {
@@ -721,6 +723,7 @@ final class OmnichannelRepository
             $this->createApprovalIfNeeded($companyId, $conversationId, $account, $message, $draft, $draftId, $decision);
             $this->logEvent($companyId, (int) $account['id'], $conversationId, (string) $account['provider'], (string) $account['channel'], 'inbound', 'queued', [
                 'ai_decision' => $decision,
+                'ai_draft' => $this->draftTrace($aiDraft),
                 'draft_message_id' => $draftId,
                 'next_step' => 'approval',
             ]);
@@ -735,6 +738,7 @@ final class OmnichannelRepository
             'body' => $draft,
             'ai_autonomous' => true,
             'ai_decision' => $decision,
+            'ai_draft' => $this->draftTrace($aiDraft),
         ]);
 
         if (!empty($send['ok'])) {
@@ -877,15 +881,26 @@ final class OmnichannelRepository
         }
     }
 
-    private function draftSupervisedReply(array $account, array $message, array $decision): string
+    private function conversationHistory(int $companyId, int $conversationId): array
     {
-        $name = trim((string) ($message['customer_name'] ?? ''));
-        $greeting = $name !== '' ? 'Hola ' . $name . ',' : 'Hola,';
-        $body = trim((string) ($message['body'] ?? ''));
-        $summary = strlen($body) > 180 ? substr($body, 0, 177) . '...' : $body;
-        $channel = (string) ($account['channel'] ?? 'canal');
+        try {
+            $statement = Database::connection()->prepare('SELECT direction, sender_name, body, created_at FROM inbox_messages WHERE company_id = :company_id AND conversation_id = :conversation_id ORDER BY id DESC LIMIT 10');
+            $statement->execute(['company_id' => $companyId, 'conversation_id' => $conversationId]);
+            return array_reverse($statement->fetchAll(PDO::FETCH_ASSOC));
+        } catch (\Throwable) {
+            return [];
+        }
+    }
 
-        return $greeting . "\n\nGracias por escribirnos. Recibi tu mensaje por {$channel}: \"" . $summary . "\".\n\nTe ayudo con esto. Para darte una respuesta correcta, revisare la informacion de la empresa y te confirmare el siguiente paso a la brevedad.\n\nSaludos,\nAsisFly";
+    private function draftTrace(array $aiDraft): array
+    {
+        return [
+            'status' => $aiDraft['status'] ?? 'fallback',
+            'provider' => $aiDraft['provider'] ?? 'simulated',
+            'model' => $aiDraft['model'] ?? 'asisfly-demo-latam',
+            'memory_hits' => $aiDraft['memory_hits'] ?? 0,
+            'error' => $aiDraft['error'] ?? null,
+        ];
     }
 
     private function messageRisk(string $body, string $priority): string

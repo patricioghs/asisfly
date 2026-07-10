@@ -490,6 +490,10 @@ final class InboxRepository
                     'confidence' => (int) ($decision['confidence'] ?? 0),
                     'reason' => (string) ($decision['reason'] ?? ''),
                     'next_step' => (string) ($payload['next_step'] ?? ''),
+                    'draft_status' => (string) ($payload['ai_draft']['status'] ?? ''),
+                    'draft_provider' => (string) ($payload['ai_draft']['provider'] ?? ''),
+                    'draft_model' => (string) ($payload['ai_draft']['model'] ?? ''),
+                    'memory_hits' => (int) ($payload['ai_draft']['memory_hits'] ?? 0),
                     'created_at' => (string) ($row['created_at'] ?? ''),
                 ];
             }, $statement->fetchAll(PDO::FETCH_ASSOC))));

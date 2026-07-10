@@ -155,6 +155,9 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                                 }] ?? 'Decision IA') ?></strong>
                                 <p><?= e($event['reason'] ?? '') ?></p>
                                 <small>Riesgo <?= e($event['risk'] ?? 'medium') ?> - <?= e((string) ($event['confidence'] ?? 0)) ?>% confianza - <?= e($event['created_at'] ?? '') ?></small>
+                                <?php if (!empty($event['draft_status'])): ?>
+                                    <small>Respuesta: <?= e($event['draft_status']) ?> / <?= e($event['draft_provider'] ?: 'simulated') ?> <?= e($event['draft_model'] ?? '') ?> - memoria <?= e((string) ($event['memory_hits'] ?? 0)) ?></small>
+                                <?php endif; ?>
                             </div>
                         </article>
                     <?php endforeach; ?>
