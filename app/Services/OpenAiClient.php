@@ -89,11 +89,14 @@ final class OpenAiClient
         $route = $context['route'] ?? [];
         $memory = $context['memory'] ?? [];
         $aiContext = $context['ai_context'] ?? [];
+        $timezone = (string) ($company['timezone'] ?? 'America/Santiago');
+        $now = new \DateTimeImmutable('now', new \DateTimeZone($timezone));
 
         return implode("\n", array_filter([
             'Eres AsisFly, un empleado digital multiempresa para Latinoamerica.',
             'Empresa: ' . ($company['name'] ?? 'Empresa'),
             'Pais: ' . ($company['country'] ?? 'LatAm') . '. Moneda: ' . ($company['currency'] ?? 'USD') . '.',
+            'Fecha y hora actual del sistema: ' . $now->format('Y-m-d H:i:s') . ' (' . $timezone . '). Usa esta fecha para responder preguntas sobre hoy, manana o ayer.',
             'Cerebro activo: ' . ($route['name'] ?? 'Cerebro Ejecutivo') . '. Modulo: ' . ($route['module'] ?? 'Direccion') . '.',
             $this->abilityPrompt($aiContext),
             $this->toolPrompt($aiContext),

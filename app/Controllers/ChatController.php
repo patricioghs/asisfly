@@ -52,6 +52,8 @@ final class ChatController extends Controller
             $control = $this->tryCreateControlFromPrompt($effectivePrompt);
             if ($control) {
                 $_SESSION['chat'][] = $control;
+            } elseif ($this->isDateRequest($effectivePrompt)) {
+                $_SESSION['chat'][] = $this->dateAnswerMessage($effectivePrompt);
             } elseif ($this->isDailyBriefingRequest($effectivePrompt)) {
                 $_SESSION['chat'][] = $this->dailyBriefingMessage();
             } else {
@@ -97,6 +99,33 @@ final class ChatController extends Controller
         }
 
         return $prompt;
+    }
+
+    private function isDateRequest(string $prompt): bool
+    {
+        $normalized = $this->normalizeText($prompt);
+        return in_array($normalized, [
+            'que fecha es hoy',
+            'fecha de hoy',
+            'dia de hoy',
+            'que dia es hoy',
+            'hoy que fecha es',
+        ], true);
+    }
+
+    private function dateAnswerMessage(string $prompt): array
+    {
+        $company = $this->currentCompany();
+        $timezone = new DateTimeZone((string) ($company['timezone'] ?? 'America/Santiago'));
+        $now = new DateTimeImmutable('now', $timezone);
+
+        return [
+            'role' => 'assistant',
+            'content' => 'Hoy es ' . $this->spanishDate($now) . '.',
+            'brain' => 'Cerebro Ejecutivo',
+            'module' => 'Direccion',
+            'status' => 'success',
+        ];
     }
 
     private function isDailyBriefingRequest(string $prompt): bool
@@ -283,6 +312,11 @@ final class ChatController extends Controller
     private function normalizeText(string $text): string
     {
         $text = function_exists('mb_strtolower') ? mb_strtolower(trim($text), 'UTF-8') : strtolower(trim($text));
+        $text = str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ü', 'Ñ'],
+            ['a', 'e', 'i', 'o', 'u', 'u', 'n', 'a', 'e', 'i', 'o', 'u', 'u', 'n'],
+            $text
+        );
         return str_replace(['?', '¿', '.', ',', '!', '¡'], '', $text);
     }
 
