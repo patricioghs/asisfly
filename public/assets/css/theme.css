@@ -1034,6 +1034,27 @@ a {
   font-size: 1.35rem;
 }
 
+.workbench-inline-form {
+  align-items: start;
+  border-top: 1px solid rgba(124, 58, 237, 0.14);
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
+.workbench-inline-form .btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.workbench-inline-form small {
+  color: var(--asisty-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .workbench-metrics {
   display: grid;
   gap: 14px;

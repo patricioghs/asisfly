@@ -589,7 +589,7 @@ final class OmnichannelRepository
         ]);
         $id = (int) $statement->fetchColumn();
         if ($id > 0) {
-            Database::connection()->prepare('UPDATE inbox_conversations SET status = IF(status = "closed", "open", status), priority = :priority, last_inbound_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
+            Database::connection()->prepare('UPDATE inbox_conversations SET status = IF(status IN ("answered", "closed"), "open", status), priority = :priority, last_inbound_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
                 'priority' => $message['priority'],
                 'company_id' => $companyId,
                 'id' => $id,

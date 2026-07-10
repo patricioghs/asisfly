@@ -71,6 +71,44 @@ final class HomeController extends Controller
         $this->redirect('/workbench' . ($query ? '?' . $query : ''));
     }
 
+    public function markWorkbenchMessageReviewed(): void
+    {
+        $this->requireAuth();
+
+        $conversationId = (int) ($_POST['conversation_id'] ?? 0);
+        if ($conversationId > 0 && Database::available() && $this->tableExists('inbox_conversations')) {
+            Database::connection()->prepare(
+                'UPDATE inbox_conversations
+                 SET status = "answered", updated_at = CURRENT_TIMESTAMP
+                 WHERE company_id = :company_id
+                   AND id = :id
+                   AND status IN ("new", "open", "pending_approval")'
+            )->execute([
+                'company_id' => $this->companyId(),
+                'id' => $conversationId,
+            ]);
+        }
+
+        $this->redirect('/workbench' . $this->workbenchFilterQuery($_POST));
+    }
+
+    public function markWorkbenchEmailsReviewed(): void
+    {
+        $this->requireAuth();
+
+        if (Database::available() && $this->tableExists('inbox_conversations')) {
+            Database::connection()->prepare(
+                'UPDATE inbox_conversations
+                 SET status = "answered", updated_at = CURRENT_TIMESTAMP
+                 WHERE company_id = :company_id
+                   AND channel = "Email"
+                   AND status IN ("new", "open", "pending_approval")'
+            )->execute(['company_id' => $this->companyId()]);
+        }
+
+        $this->redirect('/workbench' . $this->workbenchFilterQuery($_POST));
+    }
+
     public function notifications(): void
     {
         $this->requireAuth();
@@ -350,6 +388,18 @@ final class HomeController extends Controller
 
         usort($items, fn (array $a, array $b): int => [$this->priorityWeight($b['priority']), $b['sort_at']] <=> [$this->priorityWeight($a['priority']), $a['sort_at']]);
         return array_slice($items, 0, 40);
+    }
+
+    private function workbenchFilterQuery(array $source): string
+    {
+        $query = http_build_query(array_filter([
+            'view' => $source['filter_view'] ?? null,
+            'type' => $source['filter_type'] ?? null,
+            'priority' => $source['filter_priority'] ?? null,
+            'q' => $source['filter_q'] ?? null,
+        ], fn ($value) => $value !== null && $value !== ''));
+
+        return $query ? '?' . $query : '';
     }
 
     private function myDayAgenda(array $items): array

@@ -6,6 +6,7 @@ $statusLabels = [
     'draft' => 'Borrador', 'sent' => 'Enviada', 'done' => 'Lista',
 ];
 $riskLabels = ['high' => 'Riesgo alto', 'medium' => 'Riesgo medio', 'low' => 'Riesgo bajo'];
+$pendingEmailCount = count(array_filter($items, fn (array $item): bool => ($item['type'] ?? '') === 'message' && ($item['module'] ?? '') === 'Email'));
 $filterFields = function () use ($filters): void { ?>
     <input type="hidden" name="filter_view" value="<?= e($filters['view'] ?? '') ?>">
     <input type="hidden" name="filter_type" value="<?= e($filters['type'] ?? '') ?>">
@@ -29,6 +30,14 @@ $filterFields = function () use ($filters): void { ?>
         <strong><?= e((string) ($metrics[1]['value'] ?? '0')) ?> urgentes</strong>
         <p>AsisFly ordena la bandeja por impacto, riesgo y fecha para que partas por lo importante.</p>
         <a class="btn btn-primary" href="<?= url('/chat') ?>"><i class="bi bi-stars"></i> Preguntar a AsisFly</a>
+        <?php if ($pendingEmailCount > 0): ?>
+            <form method="post" action="<?= url('/workbench/emails-reviewed') ?>" class="workbench-inline-form">
+                <?= csrf_field() ?>
+                <?php $filterFields(); ?>
+                <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-check2-all"></i> Marcar correos revisados</button>
+                <small>Oculta todos los correos pendientes sin borrarlos. Los nuevos volveran a aparecer.</small>
+            </form>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -106,6 +115,13 @@ $filterFields = function () use ($filters): void { ?>
                                 <input type="hidden" name="task_id" value="<?= e((string) ($item['id'] ?? 0)) ?>">
                                 <?php $filterFields(); ?>
                                 <button class="btn btn-sm btn-light" type="submit"><i class="bi bi-check2"></i>Listo</button>
+                            </form>
+                        <?php elseif ($type === 'message'): ?>
+                            <form method="post" action="<?= url('/workbench/message-reviewed') ?>">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="conversation_id" value="<?= e((string) ($item['id'] ?? 0)) ?>">
+                                <?php $filterFields(); ?>
+                                <button class="btn btn-sm btn-light" type="submit"><i class="bi bi-check2"></i>Revisado</button>
                             </form>
                         <?php endif; ?>
                     </div>

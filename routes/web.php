@@ -41,6 +41,8 @@ $router->get('/dashboard', [DashboardController::class, 'index']);
 $router->get('/my-day', [HomeController::class, 'myDay']);
 $router->get('/workbench', [HomeController::class, 'workbench']);
 $router->post('/workbench/task-done', [HomeController::class, 'completeWorkbenchTask']);
+$router->post('/workbench/message-reviewed', [HomeController::class, 'markWorkbenchMessageReviewed']);
+$router->post('/workbench/emails-reviewed', [HomeController::class, 'markWorkbenchEmailsReviewed']);
 $router->get('/notifications', [HomeController::class, 'notifications']);
 $router->get('/mvp', [MvpController::class, 'index']);
 $router->get('/actions', [ActionController::class, 'index']);
