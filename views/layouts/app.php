@@ -2,67 +2,14 @@
 $user = $_SESSION['user'] ?? null;
 $company = $_SESSION['company'] ?? null;
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-$navigation = [
-    'Inicio' => [
-        ['/dashboard', 'Dashboard', 'bi-grid-1x2', null],
-        ['/my-day', 'Mi dia', 'bi-calendar2-check', null],
-        ['/workbench', 'Bandeja de trabajo', 'bi-briefcase', null],
-        ['/notifications', 'Notificaciones', 'bi-bell', null],
-    ],
-    'Asistente' => [
-        ['/chat', 'Chat IA', 'bi-stars', null],
-        ['/tasks', 'Tareas', 'bi-list-task', null],
-        ['/automations', 'Automatizaciones', 'bi-magic', null],
-        ['/actions', 'Aprobaciones', 'bi-check2-square', null],
-        ['/controls', 'Controles', 'bi-sliders', null],
-        ['/documents', 'Memoria', 'bi-database-check', null],
-        ['/assistant', 'Reglas', 'bi-sliders2', null],
-    ],
-    'Comunicacion' => [
-        ['/inbox', 'Omnicanal', 'bi-inboxes', null],
-        ['/social', 'Asisti Social', 'bi-megaphone', null],
-    ],
-    'Comercial' => [
-        ['/crm', 'CRM', 'bi-people', null],
-        ['/quotes', 'Cotizaciones', 'bi-file-earmark-text', null],
-    ],
-    'Inteligencia' => [
-        ['/reports', 'Reportes', 'bi-clipboard-data', null],
-        ['/analytics', 'Analytics', 'bi-graph-up-arrow', null],
-        ['/dashboards', 'Dashboards', 'bi-columns-gap', null],
-        ['/intelligence-documents', 'Documentos', 'bi-file-earmark-text', null],
-        ['/excel', 'Excel', 'bi-file-earmark-spreadsheet', null],
-        ['/indicators', 'Indicadores', 'bi-bullseye', null],
-        ['/kpis', 'KPIs', 'bi-speedometer2', null],
-        ['/brains', 'Cerebros IA', 'bi-diagram-3', null],
-    ],
-    'Conocimiento' => [
-        ['/knowledge-base', 'Base de conocimiento', 'bi-book', null],
-        ['/documents', 'Documentos', 'bi-file-earmark', null],
-        ['/catalogs', 'Catalogos', 'bi-folder2-open', null],
-        ['/manuals', 'Manuales', 'bi-journal-text', null],
-        ['/training', 'Entrenamiento', 'bi-mortarboard', null],
-    ],
-    'Integraciones' => [
-        ['/integrations', 'Integraciones', 'bi-diagram-3', null],
-        ['/integrations/accounts', 'Cuentas conectadas', 'bi-plug', null],
-        ['/apis', 'APIs', 'bi-code-slash', null],
-    ],
-    'Empresa' => [
-        ['/company', 'Empresa', 'bi-building', null],
-        ['/users', 'Usuarios', 'bi-people', null],
-        ['/roles', 'Roles', 'bi-shield-lock', null],
-        ['/billing', 'Plan y facturacion', 'bi-credit-card', null],
-        ['/company-settings', 'Configuracion', 'bi-gear', null],
-    ],
-    'Administracion (Superadmin)' => [
-        ['/admin/companies', 'Empresas', 'bi-buildings', null],
-        ['/admin/plans', 'Planes', 'bi-check2-square', null],
-        ['/admin/ai-tokens', 'IA y tokens', 'bi-cpu', null],
-        ['/admin/audit-logs', 'Auditoria y logs', 'bi-file-lock', null],
-        ['/admin/system-status', 'Estado del sistema', 'bi-record-circle', null],
-    ],
-];
+$navigation = \App\Services\AbilityRegistry::fallbackNavigation();
+if ($user) {
+    try {
+        $navigation = (new \App\Services\NavigationBuilder())->build((int) ($company['id'] ?? 0), $user);
+    } catch (\Throwable) {
+        $navigation = \App\Services\AbilityRegistry::fallbackNavigation();
+    }
+}
 ?>
 <!doctype html>
 <html lang="es" data-bs-theme="<?= e($_COOKIE['AsisFly_theme'] ?? 'light') ?>">

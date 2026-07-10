@@ -46,6 +46,7 @@ foreach ([
     __DIR__ . '/migrations/019_superadmin_api_keys_schema.sql',
     __DIR__ . '/migrations/020_platform_api_keys_schema.sql',
     __DIR__ . '/migrations/021_omnichannel_credentials_schema.sql',
+    __DIR__ . '/migrations/022_abilities_marketplace_schema.sql',
     __DIR__ . '/seeders/002_demo_data.sql',
     __DIR__ . '/seeders/003_brains_data.sql',
     __DIR__ . '/seeders/004_social_data.sql',
@@ -58,6 +59,7 @@ foreach ([
     __DIR__ . '/seeders/011_social_templates.sql',
     __DIR__ . '/seeders/012_subscriptions_demo.sql',
     __DIR__ . '/seeders/013_controls_demo.sql',
+    __DIR__ . '/seeders/014_abilities_compatibility.sql',
 ] as $file) {
     $sql = file_get_contents($file);
     if ($sql === false) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Core\Database;
+use App\Services\TenantAbilityService;
 use PDO;
 
 final class AuthRepository
@@ -94,6 +95,8 @@ final class AuthRepository
 
         $pdo->prepare('INSERT IGNORE INTO company_ai_autonomy (company_id, learning_progress, mode) VALUES (:company_id, 0, "supervised_learning")')
             ->execute(['company_id' => $companyId]);
+
+        (new TenantAbilityService())->ensureDefaultAbilities($companyId);
 
         $pdo->commit();
 
