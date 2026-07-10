@@ -212,7 +212,7 @@ final class OmnichannelRepository
             foreach ($uids as $uid) {
                 $uid = (int) $uid;
                 try {
-                    $overviewList = imap_fetch_overview($mailbox, $uid, FT_UID);
+                    $overviewList = imap_fetch_overview($mailbox, (string) $uid, FT_UID);
                     $overview = is_array($overviewList) ? ($overviewList[0] ?? null) : null;
                     if (!$overview) {
                         $skipped++;
