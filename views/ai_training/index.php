@@ -11,6 +11,10 @@ $faqs = $overview['faqs'] ?? [];
 $examples = $overview['examples'] ?? [];
 $channels = $overview['channels'] ?? [];
 $prompt = $overview['prompt'] ?? [];
+$knowledgeSources = $overview['knowledgeSources'] ?? [];
+$knowledgeStats = $overview['knowledgeStats'] ?? ['sources' => 0, 'ready' => 0, 'failed' => 0, 'chunks' => 0];
+$knowledgeQuery = $overview['knowledgeQuery'] ?? '';
+$knowledgeResults = $overview['knowledgeResults'] ?? [];
 $questions = $questions ?? [];
 $answersByKey = $answersByKey ?? [];
 $simulation = $simulation ?? null;
@@ -22,6 +26,7 @@ $tabs = [
     'personality' => ['Personalidad', 'bi-palette'],
     'rules' => ['Reglas', 'bi-shield-check'],
     'faqs' => ['Preguntas frecuentes', 'bi-question-circle'],
+    'documents' => ['Documentos', 'bi-file-earmark-text'],
     'examples' => ['Ejemplos', 'bi-chat-square-quote'],
     'simulator' => ['Simulador', 'bi-stars'],
     'settings' => ['Configuracion', 'bi-sliders'],
@@ -282,6 +287,77 @@ $progress = (int) ($session['progress_percent'] ?? 0);
                     <div><strong><?= e((string) $example['customer_message']) ?></strong><span><?= e((string) ($example['intent'] ?? 'Sin intencion')) ?> / <?= e((string) $example['channel']) ?></span><small><?= e((string) $example['ideal_response']) ?></small></div>
                 <?php endforeach; ?>
                 <?php if (!$examples): ?><p class="task-muted">Aun no hay ejemplos aprobados.</p><?php endif; ?>
+            </div>
+        </article>
+    </section>
+<?php endif; ?>
+
+<?php if ($section === 'documents'): ?>
+    <section class="workbench-metrics mt-4">
+        <article class="metric-card"><span>Fuentes</span><strong><?= e((string) ($knowledgeStats['sources'] ?? 0)) ?></strong><small>Cargadas para entrenamiento</small></article>
+        <article class="metric-card"><span>Listas</span><strong><?= e((string) ($knowledgeStats['ready'] ?? 0)) ?></strong><small>Disponibles para contexto</small></article>
+        <article class="metric-card"><span>Fragmentos</span><strong><?= e((string) ($knowledgeStats['chunks'] ?? 0)) ?></strong><small>Recuperables por busqueda</small></article>
+        <article class="metric-card"><span>Errores</span><strong><?= e((string) ($knowledgeStats['failed'] ?? 0)) ?></strong><small>Requieren revision</small></article>
+    </section>
+
+    <section class="controls-detail-grid mt-4">
+        <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/document') ?>" enctype="multipart/form-data">
+            <?= csrf_field() ?>
+            <div class="panel-title"><div><span class="eyebrow">Fuente documental</span><h2>Subir documento</h2></div></div>
+            <input class="form-control" type="file" name="document" accept=".pdf,.docx,.xlsx,.csv,.txt" required>
+            <div class="control-create-grid">
+                <input class="form-control" name="category" placeholder="Categoria: catalogo, politica, contrato">
+                <input class="form-control" name="tags" placeholder="Etiquetas">
+            </div>
+            <p class="text-secondary mb-0">Soporta PDF, DOCX, XLSX, CSV y TXT hasta 15 MB. El texto se fragmenta por empresa y no se envia completo a la IA.</p>
+            <button class="btn btn-primary"><i class="bi bi-upload"></i>Procesar documento</button>
+        </form>
+
+        <form class="panel control-entry-form" method="get" action="<?= url('/ai-training') ?>">
+            <input type="hidden" name="section" value="documents">
+            <div class="panel-title"><div><span class="eyebrow">Recuperacion</span><h2>Buscar conocimiento</h2></div></div>
+            <input class="form-control" name="knowledge_q" value="<?= e((string) $knowledgeQuery) ?>" placeholder="Ej: garantia, despacho, precios, condiciones">
+            <button class="btn btn-outline-primary"><i class="bi bi-search"></i>Buscar fragmentos</button>
+            <?php if ($knowledgeQuery !== ''): ?>
+                <span class="soft-badge"><?= e((string) count($knowledgeResults)) ?> resultados</span>
+            <?php endif; ?>
+        </form>
+    </section>
+
+    <section class="controls-detail-grid mt-4">
+        <article class="panel">
+            <div class="panel-title"><div><span class="eyebrow">Fuentes</span><h2>Documentos de entrenamiento</h2></div></div>
+            <div class="control-entry-list">
+                <?php foreach ($knowledgeSources as $source): ?>
+                    <div>
+                        <strong><?= e((string) $source['name']) ?></strong>
+                        <span><?= e((string) ($source['category'] ?? 'Sin categoria')) ?> / <?= e((string) $source['status']) ?> / <?= e((string) ($source['chunks'] ?? 0)) ?> fragmentos</span>
+                        <small><?= e((string) ($source['summary'] ?? $source['error_message'] ?? '')) ?></small>
+                        <?php if (!empty($source['document_id'])): ?>
+                            <form method="post" action="<?= url('/ai-training/document/reprocess') ?>" class="mt-2">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="document_id" value="<?= e((string) $source['document_id']) ?>">
+                                <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i>Reprocesar</button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+                <?php if (!$knowledgeSources): ?><p class="task-muted">Aun no hay fuentes documentales en el Centro de Entrenamiento.</p><?php endif; ?>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-title"><div><span class="eyebrow">Contexto encontrado</span><h2>Fragmentos relevantes</h2></div></div>
+            <div class="control-entry-list">
+                <?php foreach ($knowledgeResults as $result): ?>
+                    <div>
+                        <strong><?= e((string) $result['title']) ?></strong>
+                        <span><?= e((string) ($result['source_name'] ?? 'Fuente')) ?> / score <?= e((string) round((float) ($result['score'] ?? 0), 3)) ?></span>
+                        <small><?= e((string) $result['content']) ?></small>
+                    </div>
+                <?php endforeach; ?>
+                <?php if ($knowledgeQuery !== '' && !$knowledgeResults): ?><p class="task-muted">No se encontraron fragmentos para esa busqueda.</p><?php endif; ?>
+                <?php if ($knowledgeQuery === ''): ?><p class="task-muted">Busca una palabra o tema para verificar que AsisFly recupera el contexto correcto.</p><?php endif; ?>
             </div>
         </article>
     </section>

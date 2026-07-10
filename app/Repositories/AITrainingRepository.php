@@ -32,6 +32,10 @@ final class AITrainingRepository
             'examples' => $this->examples($companyId, 8),
             'channels' => $this->channelSettings($companyId),
             'prompt' => $this->activePrompt(),
+            'knowledgeSources' => $this->knowledgeSources($companyId, 12),
+            'knowledgeStats' => $this->knowledgeStats($companyId),
+            'knowledgeQuery' => trim((string) ($_GET['knowledge_q'] ?? '')),
+            'knowledgeResults' => $this->knowledgeResults($companyId, trim((string) ($_GET['knowledge_q'] ?? '')), 8),
         ];
     }
 
@@ -304,9 +308,51 @@ final class AITrainingRepository
             'products' => $this->searchRows('ai_products', $companyId, $query, 'name, description', $limit),
             'faqs' => $this->searchRows('ai_faqs', $companyId, $query, 'question, variants, approved_answer', $limit),
             'examples' => $this->searchRows('ai_conversation_examples', $companyId, $query, 'customer_message, ideal_response', $limit),
+            'knowledge' => $this->knowledgeResults($companyId, $query, $limit),
             'channels' => $this->channelSettings($companyId),
             'prompt' => $this->activePrompt(),
         ];
+    }
+
+    public function knowledgeSources(int $companyId, int $limit = 12): array
+    {
+        if (!$this->knowledgeReady()) {
+            return [];
+        }
+
+        return $this->rows(
+            'SELECT s.*, COUNT(c.id) AS chunks
+             FROM ai_knowledge_sources s
+             LEFT JOIN ai_knowledge_chunks c ON c.company_id = s.company_id AND c.source_id = s.id
+             WHERE s.company_id = :company_id
+             GROUP BY s.id
+             ORDER BY FIELD(s.status, "processing", "pending", "ready", "failed", "inactive"), s.id DESC
+             LIMIT ' . max(1, $limit),
+            ['company_id' => $companyId]
+        );
+    }
+
+    public function knowledgeStats(int $companyId): array
+    {
+        if (!$this->knowledgeReady()) {
+            return ['sources' => 0, 'ready' => 0, 'failed' => 0, 'chunks' => 0];
+        }
+
+        $sources = $this->scalar('SELECT COUNT(*) FROM ai_knowledge_sources WHERE company_id = :company_id', ['company_id' => $companyId]);
+        $ready = $this->scalar('SELECT COUNT(*) FROM ai_knowledge_sources WHERE company_id = :company_id AND status = "ready"', ['company_id' => $companyId]);
+        $failed = $this->scalar('SELECT COUNT(*) FROM ai_knowledge_sources WHERE company_id = :company_id AND status = "failed"', ['company_id' => $companyId]);
+        $chunks = $this->scalar('SELECT COUNT(*) FROM ai_knowledge_chunks WHERE company_id = :company_id AND status = "ready"', ['company_id' => $companyId]);
+
+        return ['sources' => $sources, 'ready' => $ready, 'failed' => $failed, 'chunks' => $chunks];
+    }
+
+    public function knowledgeResults(int $companyId, string $query, int $limit = 8): array
+    {
+        if (!$this->knowledgeReady() || trim($query) === '') {
+            return [];
+        }
+
+        return (new \App\Services\KnowledgeRetrievalService())->search($companyId, $query, $limit);
     }
 
     public function questions(): array
@@ -570,7 +616,22 @@ final class AITrainingRepository
             'examples' => [],
             'channels' => [],
             'prompt' => [],
+            'knowledgeSources' => [],
+            'knowledgeStats' => ['sources' => 0, 'ready' => 0, 'failed' => 0, 'chunks' => 0],
+            'knowledgeQuery' => '',
+            'knowledgeResults' => [],
         ];
+    }
+
+    private function knowledgeReady(): bool
+    {
+        try {
+            Database::connection()->query('SELECT 1 FROM ai_knowledge_sources LIMIT 1');
+            Database::connection()->query('SELECT 1 FROM ai_knowledge_chunks LIMIT 1');
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function text(array $input, string $key, int $max): string

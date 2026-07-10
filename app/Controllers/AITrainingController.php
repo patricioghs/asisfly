@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Repositories\AITrainingRepository;
 use App\Services\AITrainingContextBuilder;
+use App\Services\AITrainingDocumentProcessor;
 
 final class AITrainingController extends Controller
 {
@@ -102,6 +103,38 @@ final class AITrainingController extends Controller
         $this->redirect('/ai-training?section=settings');
     }
 
+    public function uploadDocument(): void
+    {
+        $this->requireTrainingAccess('ai_training.documents.manage');
+        if (empty($_FILES['document']['name'])) {
+            $_SESSION['flash_error'] = 'Selecciona un documento para entrenar a AsisFly.';
+            $this->redirect('/ai-training?section=documents');
+        }
+
+        $result = (new AITrainingDocumentProcessor())->processUpload(
+            $this->companyId(),
+            (int) ($_SESSION['user']['id'] ?? 0),
+            $_FILES['document'],
+            [
+                'category' => $_POST['category'] ?? 'Entrenamiento IA',
+                'tags' => $_POST['tags'] ?? '',
+            ]
+        );
+
+        $_SESSION[$result['ok'] ? 'flash_success' : 'flash_error'] = $result['message'] . (!empty($result['chunks']) ? ' Fragmentos: ' . (string) $result['chunks'] . '.' : '');
+        $this->redirect('/ai-training?section=documents');
+    }
+
+    public function reprocessDocument(): void
+    {
+        $this->requireTrainingAccess('ai_training.documents.manage');
+        $documentId = (int) ($_POST['document_id'] ?? 0);
+        $result = (new AITrainingDocumentProcessor())->processExistingDocument($this->companyId(), $documentId);
+
+        $_SESSION[$result['ok'] ? 'flash_success' : 'flash_error'] = $result['message'] . (!empty($result['chunks']) ? ' Fragmentos: ' . (string) $result['chunks'] . '.' : '');
+        $this->redirect('/ai-training?section=documents');
+    }
+
     public function simulate(): void
     {
         $this->requireTrainingAccess('ai_training.simulator.use');
@@ -111,7 +144,7 @@ final class AITrainingController extends Controller
             $this->redirect('/ai-training?section=simulator');
         }
 
-        $_SESSION['ai_training_simulation'] = (new AITrainingContextBuilder())->simulate($this->companyId(), $message);
+        $_SESSION['ai_training_simulation'] = (new AITrainingContextBuilder())->simulate($this->companyId(), $message, (int) ($_SESSION['user']['id'] ?? 0));
         $this->redirect('/ai-training?section=simulator');
     }
 

@@ -11,16 +11,19 @@ final class AITrainingContextBuilder
 {
     public function __construct(
         private ?AITrainingRepository $training = null,
-        private ?MemoryRepository $memory = null
+        private ?MemoryRepository $memory = null,
+        private ?KnowledgeRetrievalService $knowledge = null
     ) {
         $this->training ??= new AITrainingRepository();
         $this->memory ??= new MemoryRepository();
+        $this->knowledge ??= new KnowledgeRetrievalService();
     }
 
     public function build(int $companyId, string $query = '', array $conversationHistory = [], array $customerMemory = []): array
     {
         $training = $this->training->trainingContext($companyId, $query, 5);
-        $documents = $this->memory->search($companyId, $query, 4);
+        $knowledge = $this->knowledge->search($companyId, $query, 6);
+        $documents = $knowledge ?: $this->memory->search($companyId, $query, 4);
 
         return [
             'profile' => $training['profile'] ?? [],
@@ -31,6 +34,7 @@ final class AITrainingContextBuilder
             'faqs' => $training['faqs'] ?? [],
             'examples' => $training['examples'] ?? [],
             'documents' => $documents,
+            'knowledge' => $knowledge,
             'channels' => $training['channels'] ?? [],
             'prompt' => $training['prompt'] ?? [],
             'conversation_history' => array_slice($conversationHistory, -8),
@@ -80,7 +84,7 @@ final class AITrainingContextBuilder
         return substr(implode("\n\n", $text), 0, (int) ($context['token_budget']['max_context_chars'] ?? 9000));
     }
 
-    public function simulate(int $companyId, string $customerMessage): array
+    public function simulate(int $companyId, string $customerMessage, int $userId = 0): array
     {
         $context = $this->build($companyId, $customerMessage);
         $profile = $context['profile'] ?? [];
@@ -105,7 +109,8 @@ final class AITrainingContextBuilder
         $closing = !empty($personality['closing_style']) ? (string) $personality['closing_style'] : 'Quedo atento/a.';
         $companyName = (string) ($profile['company_name'] ?? 'la empresa');
 
-        return [
+        $contextPreview = $this->renderForPrompt($context);
+        $result = [
             'message' => $customerMessage,
             'answer' => trim($greeting . "\n\n" . $answer . "\n\n" . $closing),
             'confidence' => $this->confidence($context),
@@ -116,8 +121,23 @@ final class AITrainingContextBuilder
                 'documents' => count($documents),
                 'company' => $companyName,
             ],
-            'context_preview' => $this->renderForPrompt($context),
+            'context_preview' => $contextPreview,
         ];
+
+        $contextLogId = $this->knowledge->logContext($companyId, $userId, 'Entrenamiento IA', $customerMessage, $documents, $contextPreview);
+        $generatedId = $this->knowledge->recordGeneratedResponse($companyId, $userId, $contextLogId, [
+            'module' => 'Entrenamiento IA',
+            'channel' => 'simulator',
+            'customer_message' => $customerMessage,
+            'generated_response' => $result['answer'],
+            'confidence' => $result['confidence'],
+            'sources' => $result['sources'],
+            'status' => 'draft',
+        ]);
+        $result['context_log_id'] = $contextLogId;
+        $result['generated_response_id'] = $generatedId;
+
+        return $result;
     }
 
     private function confidence(array $context): int

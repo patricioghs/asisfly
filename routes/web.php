@@ -98,6 +98,8 @@ $router->post('/ai-training/rule', [AITrainingController::class, 'addRule']);
 $router->post('/ai-training/faq', [AITrainingController::class, 'addFaq']);
 $router->post('/ai-training/example', [AITrainingController::class, 'addExample']);
 $router->post('/ai-training/channel', [AITrainingController::class, 'saveChannel']);
+$router->post('/ai-training/document', [AITrainingController::class, 'uploadDocument']);
+$router->post('/ai-training/document/reprocess', [AITrainingController::class, 'reprocessDocument']);
 $router->post('/ai-training/simulate', [AITrainingController::class, 'simulate']);
 $router->post('/ai-training/publish', [AITrainingController::class, 'publish']);
 $router->get('/crm', [CrmController::class, 'index']);

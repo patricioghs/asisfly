@@ -19,6 +19,7 @@ try {
         __DIR__ . '/migrations/027_marketplace_canonical_catalog.sql',
         __DIR__ . '/migrations/028_omnichannel_core_default.sql',
         __DIR__ . '/migrations/029_ai_training_schema.sql',
+        __DIR__ . '/migrations/030_ai_training_knowledge_schema.sql',
         __DIR__ . '/seeders/015_ai_training_seed.sql',
     ] as $file) {
         $sql = file_get_contents($file);
