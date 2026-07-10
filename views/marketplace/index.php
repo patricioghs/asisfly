@@ -20,8 +20,16 @@
             $isActive = $tenantStatus === 'active';
             $isDisabled = $tenantStatus === 'disabled';
             $isProtected = !empty($item['is_protected']);
-            $itemTitle = trim((string) ($item['display_title'] ?: $abilityKey));
-            $itemDescription = trim((string) ($item['display_description'] ?: 'Habilidad modular de AsisFly lista para activar por empresa.'));
+            $itemTitle = trim((string) ($item['marketplace_title'] ?? ''));
+            $itemTitle = $itemTitle !== '' ? $itemTitle : trim((string) ($item['commercial_name'] ?? ''));
+            $itemTitle = $itemTitle !== '' ? $itemTitle : trim((string) ($item['ability_name'] ?? ''));
+            $itemTitle = $itemTitle !== '' ? $itemTitle : trim((string) ($item['display_title'] ?? ''));
+            $itemTitle = $itemTitle !== '' ? $itemTitle : $abilityKey;
+            $itemDescription = trim((string) ($item['long_description'] ?? ''));
+            $itemDescription = $itemDescription !== '' ? $itemDescription : trim((string) ($item['short_description'] ?? ''));
+            $itemDescription = $itemDescription !== '' ? $itemDescription : trim((string) ($item['ability_description'] ?? ''));
+            $itemDescription = $itemDescription !== '' ? $itemDescription : trim((string) ($item['display_description'] ?? ''));
+            $itemDescription = $itemDescription !== '' ? $itemDescription : 'Habilidad modular de AsisFly lista para activar por empresa.';
             if ($itemTitle === '' || $itemTitle === 'Habilidad AsisFly') {
                 $fallbackLabels = [
                     'core_workspace' => 'Operacion diaria',

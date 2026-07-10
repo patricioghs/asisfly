@@ -34,8 +34,9 @@ final class MarketplaceController extends Controller
         $this->requireAuth();
         $this->ensureCanManageMarketplace();
 
-        $abilityKey = trim((string) ($_POST['ability_key'] ?? $_POST['ability_id'] ?? ''));
+        $abilityKey = $this->abilityIdentifierFromRequest();
         $result = (new MarketplaceService())->activate($this->companyId(), $abilityKey, (int) ($_SESSION['user']['id'] ?? 0));
+        $this->logMarketplaceAction('activate', $abilityKey, $result);
 
         $_SESSION[$result['ok'] ? 'flash_success' : 'flash_error'] = $result['message'];
         $this->redirect('/marketplace');
@@ -46,11 +47,50 @@ final class MarketplaceController extends Controller
         $this->requireAuth();
         $this->ensureCanManageMarketplace();
 
-        $abilityKey = trim((string) ($_POST['ability_key'] ?? $_POST['ability_id'] ?? ''));
+        $abilityKey = $this->abilityIdentifierFromRequest();
         $result = (new MarketplaceService())->disable($this->companyId(), $abilityKey, (int) ($_SESSION['user']['id'] ?? 0));
+        $this->logMarketplaceAction('disable', $abilityKey, $result);
 
         $_SESSION[$result['ok'] ? 'flash_success' : 'flash_error'] = $result['message'];
         $this->redirect('/marketplace');
+    }
+
+    private function abilityIdentifierFromRequest(): string
+    {
+        $abilityKey = trim((string) ($_POST['ability_key'] ?? ''));
+        if ($abilityKey !== '') {
+            return $abilityKey;
+        }
+
+        return trim((string) ($_POST['ability_id'] ?? ''));
+    }
+
+    private function logMarketplaceAction(string $action, string $identifier, array $result): void
+    {
+        try {
+            $dir = dirname(__DIR__, 2) . '/logs';
+            if (!is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+
+            file_put_contents(
+                $dir . '/marketplace.log',
+                json_encode([
+                    'at' => date('c'),
+                    'action' => $action,
+                    'company_id' => $this->companyId(),
+                    'user_id' => $_SESSION['user']['id'] ?? null,
+                    'identifier' => $identifier,
+                    'post_ability_key' => $_POST['ability_key'] ?? null,
+                    'post_ability_id' => $_POST['ability_id'] ?? null,
+                    'ok' => $result['ok'] ?? false,
+                    'message' => $result['message'] ?? null,
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL,
+                FILE_APPEND | LOCK_EX
+            );
+        } catch (\Throwable) {
+            // El log no debe interrumpir la operacion del Marketplace.
+        }
     }
 
     private function ensureCanManageMarketplace(): void

@@ -104,7 +104,12 @@ final class MarketplaceService
 
         $ability = $this->resolveAbility($abilityKey);
         if (!$ability) {
-            return ['ok' => false, 'message' => 'La habilidad seleccionada no existe.'];
+            return ['ok' => false, 'message' => 'La habilidad seleccionada no existe. Identificador recibido: ' . ($abilityKey !== '' ? $abilityKey : 'vacio') . '.'];
+        }
+
+        $resolvedKey = (string) ($ability['ability_key'] ?? '');
+        if (!isset(self::CATALOG[$resolvedKey])) {
+            return ['ok' => false, 'message' => 'La habilidad seleccionada no forma parte del catalogo oficial: ' . ($resolvedKey !== '' ? $resolvedKey : 'sin clave') . '.'];
         }
 
         $missingDependencies = $this->missingRequiredDependencies((int) $ability['id'], $companyId);
@@ -139,7 +144,7 @@ final class MarketplaceService
 
         $ability = $this->resolveAbility($abilityKey);
         if (!$ability) {
-            return ['ok' => false, 'message' => 'La habilidad seleccionada no existe.'];
+            return ['ok' => false, 'message' => 'La habilidad seleccionada no existe. Identificador recibido: ' . ($abilityKey !== '' ? $abilityKey : 'vacio') . '.'];
         }
 
         $resolvedKey = (string) $ability['ability_key'];
