@@ -51,7 +51,8 @@ final class InboxController extends Controller
     {
         $this->requirePermission('chat.use');
         $conversationId = (int) ($_POST['conversation_id'] ?? 0);
-        (new InboxRepository())->sendDraft($this->companyId(), $conversationId, (int) $_SESSION['user']['id']);
+        $result = (new InboxRepository())->sendDraft($this->companyId(), $conversationId, (int) $_SESSION['user']['id']);
+        $_SESSION[!empty($result['ok']) ? 'flash_success' : 'flash_error'] = (string) ($result['message'] ?? 'No se pudo completar el envio.');
         $this->redirect('/inbox?id=' . $conversationId);
     }
 

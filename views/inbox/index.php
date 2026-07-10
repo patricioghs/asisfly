@@ -180,8 +180,8 @@ $latestDraft = $selected['latest_draft'] ?? null;
                     <form method="post" action="<?= url('/inbox/send-draft') ?>" class="reply-action-row">
                         <?= csrf_field() ?>
                         <input type="hidden" name="conversation_id" value="<?= e((string) $selected['id']) ?>">
-                        <button class="btn btn-success"><i class="bi bi-send-check"></i> Aprobar y marcar enviada</button>
-                        <span>En esta fase queda registrada como enviada y auditada por cuenta.</span>
+                        <button class="btn btn-success"><i class="bi bi-send-check"></i> Enviar respuesta</button>
+                        <span>Si la cuenta tiene SMTP y salida activa, AsisFly envia el correo real. Si falla, conserva el borrador para correccion.</span>
                     </form>
                 <?php endif; ?>
             </section>

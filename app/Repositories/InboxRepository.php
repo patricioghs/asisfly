@@ -204,16 +204,36 @@ final class InboxRepository
         ]);
     }
 
-    public function sendDraft(int $companyId, int $conversationId, int $userId): void
+    public function sendDraft(int $companyId, int $conversationId, int $userId): array
     {
         if (!$this->databaseReady() || $conversationId <= 0) {
-            return;
+            return ['ok' => false, 'message' => 'Bandeja omnicanal no disponible.'];
         }
 
         $conversation = $this->selectedConversation($companyId, $conversationId);
         $draft = $this->latestDraft($companyId, $conversationId);
         if (!$conversation || !$draft) {
-            return;
+            return ['ok' => false, 'message' => 'No hay borrador para enviar.'];
+        }
+
+        $result = (new OmnichannelRepository())->sendOutboundAttempt($companyId, $conversationId, [
+            'conversation_id' => $conversationId,
+            'message_id' => (int) $draft['id'],
+            'approved_by' => $userId,
+            'body' => $draft['body'],
+        ]);
+
+        if (empty($result['ok'])) {
+            Database::connection()->prepare('UPDATE inbox_messages SET status = "failed" WHERE company_id = :company_id AND id = :id')->execute([
+                'company_id' => $companyId,
+                'id' => (int) $draft['id'],
+            ]);
+            Database::connection()->prepare('UPDATE inbox_conversations SET status = "pending_approval", updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
+                'company_id' => $companyId,
+                'id' => $conversationId,
+            ]);
+
+            return $result;
         }
 
         Database::connection()->prepare('UPDATE inbox_messages SET status = "sent", sent_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
@@ -225,13 +245,8 @@ final class InboxRepository
             'id' => $conversationId,
         ]);
 
-        (new OmnichannelRepository())->markOutboundAttempt($companyId, $conversationId, [
-            'conversation_id' => $conversationId,
-            'message_id' => (int) $draft['id'],
-            'approved_by' => $userId,
-            'body' => $draft['body'],
-        ]);
         (new AutonomyRepository())->recordSignal($companyId, 'executed');
+        return $result;
     }
 
     public function assignHuman(int $companyId, int $conversationId, int $userId): void
@@ -279,7 +294,7 @@ final class InboxRepository
             return null;
         }
 
-        $statement = Database::connection()->prepare('SELECT * FROM inbox_messages WHERE company_id = :company_id AND conversation_id = :conversation_id AND direction = "outbound" AND status IN ("draft", "approved") ORDER BY id DESC LIMIT 1');
+        $statement = Database::connection()->prepare('SELECT * FROM inbox_messages WHERE company_id = :company_id AND conversation_id = :conversation_id AND direction = "outbound" AND status IN ("draft", "approved", "failed") ORDER BY id DESC LIMIT 1');
         $statement->execute(['company_id' => $companyId, 'conversation_id' => $conversationId]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;

@@ -7,6 +7,7 @@ namespace App\Repositories;
 use App\Core\Database;
 use App\Services\ConnectionTester;
 use App\Services\SecretVault;
+use App\Services\SmtpMailer;
 use PDO;
 
 final class OmnichannelRepository
@@ -299,32 +300,74 @@ final class OmnichannelRepository
 
     public function markOutboundAttempt(int $companyId, int $conversationId, array $payload): string
     {
+        return $this->sendOutboundAttempt($companyId, $conversationId, $payload)['message'];
+    }
+
+    public function sendOutboundAttempt(int $companyId, int $conversationId, array $payload): array
+    {
         if (!$this->databaseReady()) {
-            return 'Respuesta enviada en modo simulado.';
+            return ['ok' => false, 'status' => 'failed', 'message' => 'Base omnicanal no disponible.'];
         }
 
         $conversation = $this->conversation($companyId, $conversationId);
         if (!$conversation) {
-            return 'No se encontro la conversacion para enviar.';
+            return ['ok' => false, 'status' => 'failed', 'message' => 'No se encontro la conversacion para enviar.'];
         }
 
         $account = $this->accountForConversation($companyId, (int) ($conversation['account_id'] ?? 0), $conversation['provider'] ?? '', $conversation['channel']);
         $status = 'queued';
         $message = 'Envio registrado. ';
+        $ok = false;
 
         if (!$account) {
             $status = 'failed';
             $message .= 'No hay cuenta omnicanal configurada para este canal.';
         } elseif (!$account['outbound_enabled']) {
             $status = 'queued';
-            $message .= 'El conector esta en sandbox; queda listo para proveedor real con aprobacion humana.';
+            $message .= 'La salida real de esta cuenta no esta habilitada. Activa "Enviar" en Cuentas conectadas.';
+        } elseif (($conversation['channel'] ?? '') === 'Email') {
+            $send = $this->sendEmailOutbound($account, $conversation, $payload);
+            $ok = $send['ok'];
+            $status = $send['ok'] ? 'sent' : 'failed';
+            $message = $send['message'];
         } else {
-            $message .= 'Conector outbound activo; envio real pendiente de adaptador especifico.';
+            $message .= 'Conector outbound activo; envio real pendiente de adaptador especifico para ' . $conversation['channel'] . '.';
         }
 
         $this->logEvent($companyId, (int) ($account['id'] ?? 0) ?: null, $conversationId, $conversation['provider'] ?: (string) ($account['provider'] ?? 'unknown'), $conversation['channel'], 'outbound', $status, $payload);
 
-        return $message;
+        return ['ok' => $ok, 'status' => $status, 'message' => $message];
+    }
+
+    private function sendEmailOutbound(array $account, array $conversation, array $payload): array
+    {
+        $credentials = $this->decryptCredentials($account);
+        if (!$credentials || ($credentials['type'] ?? '') !== 'email_imap_smtp') {
+            return ['ok' => false, 'message' => 'No hay credenciales SMTP guardadas para esta cuenta.'];
+        }
+
+        $to = trim((string) ($conversation['customer_handle'] ?? ''));
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'message' => 'El cliente no tiene un correo valido como destinatario.'];
+        }
+
+        $body = trim((string) ($payload['body'] ?? ''));
+        if ($body === '') {
+            return ['ok' => false, 'message' => 'El borrador esta vacio.'];
+        }
+
+        try {
+            (new SmtpMailer())->send(
+                $credentials,
+                $to,
+                'Re: ' . (string) ($conversation['subject'] ?? 'Respuesta'),
+                $body
+            );
+
+            return ['ok' => true, 'message' => 'Correo enviado por SMTP a ' . $to . '.'];
+        } catch (\Throwable $exception) {
+            return ['ok' => false, 'message' => 'No se pudo enviar por SMTP: ' . $exception->getMessage()];
+        }
     }
 
     private function databaseReady(): bool
