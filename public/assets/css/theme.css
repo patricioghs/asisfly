@@ -2758,6 +2758,27 @@ a {
   gap: 8px;
 }
 
+.supervision-decision-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.supervision-decision-tags span {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--asisty-border);
+  border-radius: 999px;
+  color: var(--asisty-muted);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 850;
+  gap: 6px;
+  line-height: 1;
+  padding: 6px 9px;
+}
+
 .supervision-actions form {
   margin: 0;
 }

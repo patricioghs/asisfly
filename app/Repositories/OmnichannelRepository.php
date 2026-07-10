@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Core\Database;
+use App\Repositories\ActionRepository;
+use App\Repositories\AutonomyRepository;
 use App\Services\ConnectionTester;
 use App\Services\SecretVault;
 use App\Services\SmtpMailer;
@@ -290,12 +292,20 @@ final class OmnichannelRepository
         $pdo->beginTransaction();
 
         $conversationId = $this->upsertConversation((int) $account['company_id'], $account, $message);
-        $this->insertInboundMessage((int) $account['company_id'], $conversationId, $account, $message);
+        $inserted = $this->insertInboundMessage((int) $account['company_id'], $conversationId, $account, $message);
         $this->logEvent((int) $account['company_id'], (int) $account['id'], $conversationId, $account['provider'], $account['channel'], 'inbound', 'received', $payload);
 
         $pdo->commit();
+        if (!$inserted) {
+            return ['ok' => true, 'conversation_id' => $conversationId, 'message' => 'Mensaje duplicado omitido.'];
+        }
+        $decision = $this->superviseInboundConversation((int) $account['company_id'], $conversationId, $account, $message);
 
-        return ['ok' => true, 'conversation_id' => $conversationId, 'message' => 'Mensaje recibido e ingresado a la bandeja.'];
+        return [
+            'ok' => true,
+            'conversation_id' => $conversationId,
+            'message' => 'Mensaje recibido. ' . $decision['message'],
+        ];
     }
 
     public function markOutboundAttempt(int $companyId, int $conversationId, array $payload): string
@@ -657,13 +667,13 @@ final class OmnichannelRepository
         return (int) Database::connection()->lastInsertId();
     }
 
-    private function insertInboundMessage(int $companyId, int $conversationId, array $account, array $message): void
+    private function insertInboundMessage(int $companyId, int $conversationId, array $account, array $message): bool
     {
         if ($message['external_message_id']) {
             $existing = Database::connection()->prepare('SELECT id FROM inbox_messages WHERE company_id = :company_id AND external_message_id = :external_message_id LIMIT 1');
             $existing->execute(['company_id' => $companyId, 'external_message_id' => $message['external_message_id']]);
             if ($existing->fetchColumn()) {
-                return;
+                return false;
             }
         }
 
@@ -677,6 +687,261 @@ final class OmnichannelRepository
             'sender_name' => $message['customer_name'],
             'body' => $message['body'],
         ]);
+
+        return true;
+    }
+
+    private function superviseInboundConversation(int $companyId, int $conversationId, array $account, array $message): array
+    {
+        $autonomy = (new AutonomyRepository())->profile($companyId);
+        $decision = $this->automationDecision($account, $message, $autonomy);
+        $draft = $this->draftSupervisedReply($account, $message, $decision);
+
+        if ($decision['mode'] === 'human_required') {
+            Database::connection()->prepare('UPDATE inbox_conversations SET status = "open", assigned_to = :assigned_to, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
+                'assigned_to' => !empty($account['assigned_user_id']) ? (int) $account['assigned_user_id'] : null,
+                'company_id' => $companyId,
+                'id' => $conversationId,
+            ]);
+            $this->logEvent($companyId, (int) $account['id'], $conversationId, (string) $account['provider'], (string) $account['channel'], 'inbound', 'queued', [
+                'ai_decision' => $decision,
+                'next_step' => 'human_review',
+            ]);
+
+            return ['mode' => 'human_required', 'message' => 'AsisFly derivo la conversacion a supervision humana.'];
+        }
+
+        $draftId = $this->insertAiDraft($companyId, $conversationId, $account, $draft);
+
+        if ($decision['mode'] === 'approval_required') {
+            Database::connection()->prepare('UPDATE inbox_conversations SET status = "pending_approval", updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
+                'company_id' => $companyId,
+                'id' => $conversationId,
+            ]);
+            $this->createApprovalIfNeeded($companyId, $conversationId, $account, $message, $draft, $draftId, $decision);
+            $this->logEvent($companyId, (int) $account['id'], $conversationId, (string) $account['provider'], (string) $account['channel'], 'inbound', 'queued', [
+                'ai_decision' => $decision,
+                'draft_message_id' => $draftId,
+                'next_step' => 'approval',
+            ]);
+
+            return ['mode' => 'approval_required', 'message' => 'AsisFly preparo un borrador y lo dejo pendiente de aprobacion.'];
+        }
+
+        $send = $this->sendOutboundAttempt($companyId, $conversationId, [
+            'conversation_id' => $conversationId,
+            'message_id' => $draftId,
+            'approved_by' => null,
+            'body' => $draft,
+            'ai_autonomous' => true,
+            'ai_decision' => $decision,
+        ]);
+
+        if (!empty($send['ok'])) {
+            Database::connection()->prepare('UPDATE inbox_messages SET status = "sent", sent_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
+                'company_id' => $companyId,
+                'id' => $draftId,
+            ]);
+            Database::connection()->prepare('UPDATE inbox_conversations SET status = "answered", last_outbound_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
+                'company_id' => $companyId,
+                'id' => $conversationId,
+            ]);
+            (new AutonomyRepository())->recordSignal($companyId, 'autonomous_executed');
+
+            return ['mode' => 'auto_resolved', 'message' => 'AsisFly respondio automaticamente y registro auditoria.'];
+        }
+
+        Database::connection()->prepare('UPDATE inbox_messages SET status = "failed" WHERE company_id = :company_id AND id = :id')->execute([
+            'company_id' => $companyId,
+            'id' => $draftId,
+        ]);
+        Database::connection()->prepare('UPDATE inbox_conversations SET status = "pending_approval", updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([
+            'company_id' => $companyId,
+            'id' => $conversationId,
+        ]);
+        $this->createApprovalIfNeeded($companyId, $conversationId, $account, $message, $draft, $draftId, [
+            ...$decision,
+            'mode' => 'approval_required',
+            'reason' => 'El envio automatico fallo: ' . (string) ($send['message'] ?? 'sin detalle'),
+        ]);
+
+        return ['mode' => 'approval_required', 'message' => 'AsisFly preparo respuesta, pero necesita revision porque el envio automatico fallo.'];
+    }
+
+    private function automationDecision(array $account, array $message, array $autonomy): array
+    {
+        $risk = $this->messageRisk((string) ($message['body'] ?? ''), (string) ($message['priority'] ?? 'medium'));
+        $confidence = $this->messageConfidence((string) ($message['body'] ?? ''), $risk, $autonomy);
+        $requiresApproval = (new AutonomyRepository())->requiresApproval($autonomy, $risk);
+        $accountRequiresApproval = !empty($account['requires_approval']);
+        $outboundEnabled = !empty($account['outbound_enabled']);
+
+        if ($this->needsHuman((string) ($message['body'] ?? ''), $risk)) {
+            return [
+                'mode' => 'human_required',
+                'risk' => $risk,
+                'confidence' => $confidence,
+                'reason' => 'Mensaje sensible o ambiguo. Requiere criterio humano antes de responder.',
+                'autonomy_mode' => $autonomy['mode'] ?? 'supervised_learning',
+            ];
+        }
+
+        if ($accountRequiresApproval || $requiresApproval || !$outboundEnabled || $confidence < 82) {
+            $reason = !$outboundEnabled
+                ? 'La cuenta no tiene salida real activa.'
+                : ($accountRequiresApproval ? 'La cuenta exige aprobacion humana.' : 'La autonomia actual requiere aprobacion para este riesgo.');
+
+            return [
+                'mode' => 'approval_required',
+                'risk' => $risk,
+                'confidence' => $confidence,
+                'reason' => $reason,
+                'autonomy_mode' => $autonomy['mode'] ?? 'supervised_learning',
+            ];
+        }
+
+        return [
+            'mode' => 'auto_resolved',
+            'risk' => $risk,
+            'confidence' => $confidence,
+            'reason' => 'Consulta simple, cuenta con salida activa y autonomia suficiente.',
+            'autonomy_mode' => $autonomy['mode'] ?? 'supervised_learning',
+        ];
+    }
+
+    private function insertAiDraft(int $companyId, int $conversationId, array $account, string $draft): int
+    {
+        $existing = Database::connection()->prepare('SELECT id FROM inbox_messages WHERE company_id = :company_id AND conversation_id = :conversation_id AND direction = "outbound" AND ai_generated = 1 AND status IN ("draft", "approved", "failed") ORDER BY id DESC LIMIT 1');
+        $existing->execute(['company_id' => $companyId, 'conversation_id' => $conversationId]);
+        $existingId = (int) $existing->fetchColumn();
+        if ($existingId > 0) {
+            Database::connection()->prepare('UPDATE inbox_messages SET body = :body, status = "draft", sender_name = "AsisFly" WHERE company_id = :company_id AND id = :id')->execute([
+                'body' => $draft,
+                'company_id' => $companyId,
+                'id' => $existingId,
+            ]);
+            return $existingId;
+        }
+
+        Database::connection()->prepare('INSERT INTO inbox_messages (company_id, account_id, conversation_id, provider, direction, sender_name, body, ai_generated, status) VALUES (:company_id, :account_id, :conversation_id, :provider, "outbound", "AsisFly", :body, 1, "draft")')->execute([
+            'company_id' => $companyId,
+            'account_id' => $account['id'],
+            'conversation_id' => $conversationId,
+            'provider' => $account['provider'],
+            'body' => $draft,
+        ]);
+
+        return (int) Database::connection()->lastInsertId();
+    }
+
+    private function createApprovalIfNeeded(int $companyId, int $conversationId, array $account, array $message, string $draft, int $draftId, array $decision): void
+    {
+        if ($this->pendingApprovalExists($companyId, $conversationId)) {
+            return;
+        }
+
+        (new ActionRepository())->create($companyId, !empty($account['assigned_user_id']) ? (int) $account['assigned_user_id'] : null, [
+            'title' => 'Supervisar respuesta de AsisFly',
+            'description' => 'AsisFly preparo una respuesta para ' . ($message['customer_name'] ?? 'cliente') . '. Motivo: ' . ($decision['reason'] ?? 'requiere revision.'),
+            'module' => 'Omnicanal',
+            'brain' => $this->brainLabel((string) ($account['brain_key'] ?? 'commercial')),
+            'action_type' => 'send_omnichannel_reply',
+            'priority' => $message['priority'] ?? 'medium',
+            'risk_level' => $decision['risk'] ?? 'medium',
+            'assigned_to' => !empty($account['assigned_user_id']) ? (int) $account['assigned_user_id'] : null,
+            'requires_approval' => true,
+            'payload' => [
+                'conversation_id' => $conversationId,
+                'message_id' => $draftId,
+                'account_id' => (int) $account['id'],
+                'account' => $account['display_name'] ?? null,
+                'channel' => $account['channel'],
+                'reply' => $draft,
+                'body' => $draft,
+                'ai_decision' => $decision,
+            ],
+        ]);
+    }
+
+    private function pendingApprovalExists(int $companyId, int $conversationId): bool
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT id FROM action_center_items WHERE company_id = :company_id AND action_type = "send_omnichannel_reply" AND status = "pending" AND payload_json LIKE :needle LIMIT 1');
+            $statement->execute([
+                'company_id' => $companyId,
+                'needle' => '%"conversation_id":' . $conversationId . '%',
+            ]);
+            return (bool) $statement->fetchColumn();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function draftSupervisedReply(array $account, array $message, array $decision): string
+    {
+        $name = trim((string) ($message['customer_name'] ?? ''));
+        $greeting = $name !== '' ? 'Hola ' . $name . ',' : 'Hola,';
+        $body = trim((string) ($message['body'] ?? ''));
+        $summary = strlen($body) > 180 ? substr($body, 0, 177) . '...' : $body;
+        $channel = (string) ($account['channel'] ?? 'canal');
+
+        return $greeting . "\n\nGracias por escribirnos. Recibi tu mensaje por {$channel}: \"" . $summary . "\".\n\nTe ayudo con esto. Para darte una respuesta correcta, revisare la informacion de la empresa y te confirmare el siguiente paso a la brevedad.\n\nSaludos,\nAsisFly";
+    }
+
+    private function messageRisk(string $body, string $priority): string
+    {
+        $text = strtolower($body);
+        foreach (['reclamo', 'denuncia', 'legal', 'abogado', 'demanda', 'devolucion', 'reembolso', 'cancelar', 'molesto', 'urgente'] as $word) {
+            if (str_contains($text, $word)) {
+                return 'high';
+            }
+        }
+
+        if ($priority === 'high' || str_contains($text, 'cotizacion') || str_contains($text, 'precio') || str_contains($text, 'comprar')) {
+            return 'medium';
+        }
+
+        return 'low';
+    }
+
+    private function messageConfidence(string $body, string $risk, array $autonomy): int
+    {
+        $progress = (int) ($autonomy['learning_progress'] ?? 0);
+        $base = match ($risk) {
+            'high' => 45,
+            'medium' => 68,
+            default => 82,
+        };
+        $lengthPenalty = strlen($body) > 1200 ? 12 : (strlen($body) < 20 ? 10 : 0);
+
+        return max(20, min(96, $base + (int) floor($progress / 5) - $lengthPenalty));
+    }
+
+    private function needsHuman(string $body, string $risk): bool
+    {
+        if ($risk === 'high') {
+            return true;
+        }
+
+        $text = strtolower($body);
+        foreach (['no entiendo', 'hablar con humano', 'supervisor', 'gerente', 'reclamo formal'] as $word) {
+            if (str_contains($text, $word)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function brainLabel(string $brainKey): string
+    {
+        return match ($brainKey) {
+            'administrative' => 'Cerebro Administrativo',
+            'analytical' => 'Cerebro Analitico',
+            'operational' => 'Cerebro Operacional',
+            'executive' => 'Cerebro Ejecutivo',
+            default => 'Cerebro Comercial',
+        };
     }
 
     private function logEvent(int $companyId, ?int $accountId, ?int $conversationId, string $provider, string $channel, string $direction, string $status, array $payload, ?string $error = null): void

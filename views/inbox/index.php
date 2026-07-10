@@ -98,6 +98,12 @@ $filterQuery = http_build_query(array_filter($filters ?? [], fn ($value) => $val
                     <h3><?= e($selected['ai_activity'] ?? 'AsisFly reviso la conversacion') ?></h3>
                     <p><?= e($selected['ai_summary'] ?? '') ?></p>
                     <small><?= e($selected['ai_reason'] ?? '') ?></small>
+                    <?php if (!empty($selected['ai_decision'])): ?>
+                        <div class="supervision-decision-tags">
+                            <span><i class="bi bi-shield-check"></i> Riesgo <?= e((string) ($selected['ai_decision']['risk'] ?? 'medio')) ?></span>
+                            <span><i class="bi bi-sliders"></i> <?= e((string) ($selected['ai_decision']['autonomy_mode'] ?? 'supervised_learning')) ?></span>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 <div class="supervision-confidence">
                     <strong><?= e((string) ($selected['ai_confidence'] ?? 0)) ?>%</strong>

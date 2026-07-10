@@ -342,10 +342,16 @@ final class ActionRepository
             }
 
             if ($status === 'executed') {
-                $affected = $this->updateInboxDraft($companyId, $conversationId, 'approved', 'sent');
-                $this->markConversationAnswered($companyId, $conversationId);
                 $result = (new OmnichannelRepository())->markOutboundAttempt($companyId, $conversationId, $payload);
-                return "{$result} {$affected} mensaje quedo marcado como enviado.";
+                if (str_contains(strtolower($result), 'enviado')) {
+                    $affected = $this->updateInboxDraft($companyId, $conversationId, 'approved', 'sent');
+                    $this->markConversationAnswered($companyId, $conversationId);
+                    return "{$result} {$affected} mensaje quedo marcado como enviado.";
+                }
+
+                $this->updateInboxDraft($companyId, $conversationId, 'approved', 'failed');
+                $this->markConversationPendingApproval($companyId, $conversationId);
+                return $result . ' El borrador queda pendiente para correccion o reintento.';
             }
         }
 
@@ -397,6 +403,14 @@ final class ActionRepository
     private function markConversationAnswered(int $companyId, int $conversationId): void
     {
         Database::connection()->prepare('UPDATE inbox_conversations SET status = "answered" WHERE company_id = :company_id AND id = :id')->execute([
+            'company_id' => $companyId,
+            'id' => $conversationId,
+        ]);
+    }
+
+    private function markConversationPendingApproval(int $companyId, int $conversationId): void
+    {
+        Database::connection()->prepare('UPDATE inbox_conversations SET status = "pending_approval" WHERE company_id = :company_id AND id = :id')->execute([
             'company_id' => $companyId,
             'id' => $conversationId,
         ]);

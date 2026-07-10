@@ -98,6 +98,7 @@ final class InboxRepository
         $messages->execute(['company_id' => $companyId, 'conversation_id' => $id]);
         $conversation['messages'] = $messages->fetchAll(PDO::FETCH_ASSOC);
         $conversation['latest_draft'] = $this->latestDraft($companyId, $id);
+        $conversation = $this->applyLatestAiDecision($companyId, $id, $conversation);
 
         return $conversation;
     }
@@ -388,6 +389,64 @@ final class InboxRepository
         $conversation['requires_human'] = in_array($state, ['approval_required', 'human_required', 'human_reviewing'], true);
 
         return $conversation;
+    }
+
+    private function applyLatestAiDecision(int $companyId, int $conversationId, array $conversation): array
+    {
+        $decision = $this->latestAiDecision($companyId, $conversationId);
+        if (!$decision) {
+            return $conversation;
+        }
+
+        $mode = (string) ($decision['mode'] ?? '');
+        $state = match ($mode) {
+            'auto_resolved' => 'ai_resolved',
+            'approval_required' => 'approval_required',
+            'human_required' => 'human_required',
+            default => (string) ($conversation['ai_state'] ?? 'human_required'),
+        };
+        $labels = [
+            'ai_resolved' => 'Resuelta por IA',
+            'approval_required' => 'Requiere aprobacion',
+            'human_required' => 'Requiere humano',
+            'human_reviewing' => 'En revision humana',
+            'human_answered' => 'Respondida por humano',
+            'closed' => 'Cerrada',
+        ];
+        $activities = [
+            'ai_resolved' => 'IA respondio automaticamente',
+            'approval_required' => 'IA preparo una respuesta para revisar',
+            'human_required' => 'IA escalo la conversacion',
+            'human_reviewing' => 'Humano esta revisando',
+            'human_answered' => 'Humano respondio la conversacion',
+            'closed' => 'Conversacion cerrada',
+        ];
+
+        $conversation['ai_state'] = $state;
+        $conversation['ai_state_label'] = $labels[$state] ?? 'Requiere supervision';
+        $conversation['ai_activity'] = $activities[$state] ?? 'AsisFly reviso la conversacion';
+        $conversation['ai_reason'] = (string) ($decision['reason'] ?? $conversation['ai_reason'] ?? '');
+        $conversation['ai_confidence'] = (int) ($decision['confidence'] ?? $conversation['ai_confidence'] ?? 0);
+        $conversation['ai_decision'] = $decision;
+
+        return $conversation;
+    }
+
+    private function latestAiDecision(int $companyId, int $conversationId): ?array
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT payload_json FROM omnichannel_events WHERE company_id = :company_id AND conversation_id = :conversation_id AND payload_json LIKE :needle ORDER BY id DESC LIMIT 1');
+            $statement->execute([
+                'company_id' => $companyId,
+                'conversation_id' => $conversationId,
+                'needle' => '%"ai_decision"%',
+            ]);
+            $payload = json_decode((string) $statement->fetchColumn(), true);
+            $decision = is_array($payload) ? ($payload['ai_decision'] ?? null) : null;
+            return is_array($decision) ? $decision : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function draftReply(array $conversation, string $lastMessage): string
