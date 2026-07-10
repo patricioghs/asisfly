@@ -7,8 +7,17 @@ $messageStatusOptions = ['received' => 'Recibido', 'draft' => 'Borrador', 'appro
 $connectorStatusOptions = ['simulated' => 'Demo', 'sandbox' => 'Prueba', 'connected' => 'Conectado', 'disabled' => 'Pausado', 'error' => 'Error'];
 $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Instagram' => 'bi-instagram', 'Messenger' => 'bi-messenger', 'Email' => 'bi-envelope-at'];
 $brainLabels = ['commercial' => 'Ventas y clientes', 'administrative' => 'Administracion', 'analytical' => 'Analisis y reportes', 'operational' => 'Operaciones', 'executive' => 'Direccion'];
+$aiStateOptions = [
+    'approval_required' => 'Requiere aprobacion',
+    'human_required' => 'Requiere humano',
+    'human_reviewing' => 'En revision humana',
+    'ai_resolved' => 'Resuelta por IA',
+    'human_answered' => 'Respondida por humano',
+    'closed' => 'Cerrada',
+];
 $latestDraft = $selected['latest_draft'] ?? null;
 $filterQuery = http_build_query(array_filter($filters ?? [], fn ($value) => $value !== ''));
+$quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(array_filter([...($filters ?? []), ...$extra], fn ($value) => $value !== '')));
 ?>
 <div class="inbox-hero panel supervision-hero">
     <div>
@@ -51,9 +60,26 @@ $filterQuery = http_build_query(array_filter($filters ?? [], fn ($value) => $val
                     <option value="<?= e($value) ?>" <?= ($filters['priority'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
                 <?php endforeach; ?>
             </select>
+            <select class="form-select" name="ai_state">
+                <option value="">Todos los estados IA</option>
+                <?php foreach ($aiStateOptions as $value => $label): ?>
+                    <option value="<?= e($value) ?>" <?= ($filters['ai_state'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <label class="supervision-intervention-toggle">
+                <input type="checkbox" name="intervention" value="1" <?= !empty($filters['intervention']) ? 'checked' : '' ?>>
+                <span>Solo intervencion</span>
+            </label>
             <button class="btn btn-primary"><i class="bi bi-funnel"></i> Filtrar</button>
             <a class="btn btn-outline-secondary" href="<?= url('/inbox') ?>">Limpiar</a>
         </form>
+
+        <div class="supervision-quick-filters">
+            <a class="<?= !empty($filters['intervention']) ? 'active' : '' ?>" href="<?= e($quickFilter(['intervention' => '1', 'ai_state' => ''])) ?>"><i class="bi bi-person-exclamation"></i> Necesitan mi intervencion</a>
+            <a class="<?= ($filters['ai_state'] ?? '') === 'approval_required' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'approval_required', 'intervention' => ''])) ?>"><i class="bi bi-shield-check"></i> Por aprobar</a>
+            <a class="<?= ($filters['ai_state'] ?? '') === 'human_required' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'human_required', 'intervention' => ''])) ?>"><i class="bi bi-person-raised-hand"></i> Requieren humano</a>
+            <a class="<?= ($filters['ai_state'] ?? '') === 'ai_resolved' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'ai_resolved', 'intervention' => ''])) ?>"><i class="bi bi-check2-circle"></i> Resueltas por IA</a>
+        </div>
 
         <div class="supervision-section-label">Prioridad humana</div>
         <?php foreach ($conversations as $conversation): ?>
@@ -110,6 +136,30 @@ $filterQuery = http_build_query(array_filter($filters ?? [], fn ($value) => $val
                     <span>confianza IA</span>
                 </div>
             </section>
+
+            <?php if (!empty($selected['decision_timeline'])): ?>
+                <section class="supervision-decision-timeline">
+                    <div>
+                        <span class="eyebrow">Historial de decisiones</span>
+                        <h3>Que hizo AsisFly</h3>
+                    </div>
+                    <?php foreach ($selected['decision_timeline'] as $event): ?>
+                        <article>
+                            <i class="bi bi-cpu"></i>
+                            <div>
+                                <strong><?= e($aiStateOptions[match ($event['mode'] ?? '') {
+                                    'auto_resolved' => 'ai_resolved',
+                                    'approval_required' => 'approval_required',
+                                    'human_required' => 'human_required',
+                                    default => 'human_reviewing',
+                                }] ?? 'Decision IA') ?></strong>
+                                <p><?= e($event['reason'] ?? '') ?></p>
+                                <small>Riesgo <?= e($event['risk'] ?? 'medium') ?> - <?= e((string) ($event['confidence'] ?? 0)) ?>% confianza - <?= e($event['created_at'] ?? '') ?></small>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </section>
+            <?php endif; ?>
 
             <div class="supervision-actions">
                 <form method="post" action="<?= url('/inbox/status') ?>">

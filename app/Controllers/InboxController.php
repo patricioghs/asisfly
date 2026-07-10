@@ -20,6 +20,8 @@ final class InboxController extends Controller
             'account_id' => trim((string) ($_GET['account_id'] ?? '')),
             'status' => trim((string) ($_GET['status'] ?? '')),
             'priority' => trim((string) ($_GET['priority'] ?? '')),
+            'ai_state' => trim((string) ($_GET['ai_state'] ?? '')),
+            'intervention' => trim((string) ($_GET['intervention'] ?? '')),
         ];
 
         $this->view('inbox/index', [

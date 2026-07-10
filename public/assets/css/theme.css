@@ -2619,6 +2619,54 @@ a {
   text-transform: uppercase;
 }
 
+.supervision-intervention-toggle {
+  align-items: center;
+  background: var(--asisty-surface-soft);
+  border: 1px solid var(--asisty-border);
+  border-radius: 14px;
+  color: var(--asisty-text);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.85rem;
+  font-weight: 850;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.supervision-intervention-toggle input {
+  accent-color: var(--asisty-primary);
+}
+
+.supervision-quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.supervision-quick-filters a {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--asisty-border);
+  border-radius: 999px;
+  color: var(--asisty-muted);
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 850;
+  gap: 6px;
+  line-height: 1;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.supervision-quick-filters a.active,
+.supervision-quick-filters a:hover {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.24);
+  color: var(--asisty-primary);
+}
+
 .supervision-row {
   box-shadow: none;
   display: grid;
@@ -2756,6 +2804,63 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.supervision-decision-timeline {
+  background: #ffffff;
+  border: 1px solid var(--asisty-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.supervision-decision-timeline h3 {
+  color: var(--asisty-text);
+  font-size: 1rem;
+  font-weight: 900;
+  margin: 4px 0 0;
+}
+
+.supervision-decision-timeline article {
+  align-items: flex-start;
+  background: var(--asisty-surface-soft);
+  border: 1px solid var(--asisty-border);
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  padding: 12px;
+}
+
+.supervision-decision-timeline article > i {
+  align-items: center;
+  background: rgba(124, 58, 237, 0.12);
+  border-radius: 999px;
+  color: var(--asisty-primary);
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.supervision-decision-timeline strong {
+  color: var(--asisty-text);
+  display: block;
+  font-weight: 900;
+  margin-bottom: 3px;
+}
+
+.supervision-decision-timeline p {
+  color: var(--asisty-muted);
+  line-height: 1.45;
+  margin: 0 0 5px;
+}
+
+.supervision-decision-timeline small {
+  color: var(--asisty-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .supervision-decision-tags {

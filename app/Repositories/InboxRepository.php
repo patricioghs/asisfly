@@ -60,7 +60,9 @@ final class InboxRepository
         $statement = Database::connection()->prepare($sql);
         $statement->execute($params);
 
-        return array_map(fn (array $row): array => $this->decorateConversation($row), $statement->fetchAll(PDO::FETCH_ASSOC));
+        $conversations = array_map(fn (array $row): array => $this->decorateConversation($row), $statement->fetchAll(PDO::FETCH_ASSOC));
+
+        return $this->filterBySupervisionState($conversations, $filters);
     }
 
     public function selectedConversation(int $companyId, int $id, array $filters = []): ?array
@@ -99,6 +101,7 @@ final class InboxRepository
         $conversation['messages'] = $messages->fetchAll(PDO::FETCH_ASSOC);
         $conversation['latest_draft'] = $this->latestDraft($companyId, $id);
         $conversation = $this->applyLatestAiDecision($companyId, $id, $conversation);
+        $conversation['decision_timeline'] = $this->decisionTimeline($companyId, $id);
 
         return $conversation;
     }
@@ -432,6 +435,20 @@ final class InboxRepository
         return $conversation;
     }
 
+    private function filterBySupervisionState(array $conversations, array $filters): array
+    {
+        $state = (string) ($filters['ai_state'] ?? '');
+        if ($state !== '') {
+            $conversations = array_values(array_filter($conversations, fn (array $conversation): bool => ($conversation['ai_state'] ?? '') === $state));
+        }
+
+        if (!empty($filters['intervention'])) {
+            $conversations = array_values(array_filter($conversations, fn (array $conversation): bool => !empty($conversation['requires_human'])));
+        }
+
+        return $conversations;
+    }
+
     private function latestAiDecision(int $companyId, int $conversationId): ?array
     {
         try {
@@ -446,6 +463,38 @@ final class InboxRepository
             return is_array($decision) ? $decision : null;
         } catch (\Throwable) {
             return null;
+        }
+    }
+
+    private function decisionTimeline(int $companyId, int $conversationId): array
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT status, payload_json, created_at FROM omnichannel_events WHERE company_id = :company_id AND conversation_id = :conversation_id AND payload_json LIKE :needle ORDER BY id DESC LIMIT 8');
+            $statement->execute([
+                'company_id' => $companyId,
+                'conversation_id' => $conversationId,
+                'needle' => '%"ai_decision"%',
+            ]);
+
+            return array_values(array_filter(array_map(function (array $row): ?array {
+                $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+                $decision = is_array($payload) ? ($payload['ai_decision'] ?? null) : null;
+                if (!is_array($decision)) {
+                    return null;
+                }
+
+                return [
+                    'status' => (string) ($row['status'] ?? ''),
+                    'mode' => (string) ($decision['mode'] ?? ''),
+                    'risk' => (string) ($decision['risk'] ?? 'medium'),
+                    'confidence' => (int) ($decision['confidence'] ?? 0),
+                    'reason' => (string) ($decision['reason'] ?? ''),
+                    'next_step' => (string) ($payload['next_step'] ?? ''),
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                ];
+            }, $statement->fetchAll(PDO::FETCH_ASSOC))));
+        } catch (\Throwable) {
+            return [];
         }
     }
 
