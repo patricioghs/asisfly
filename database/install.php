@@ -69,6 +69,7 @@ foreach ([
     __DIR__ . '/seeders/012_subscriptions_demo.sql',
     __DIR__ . '/seeders/013_controls_demo.sql',
     __DIR__ . '/seeders/014_abilities_compatibility.sql',
+    __DIR__ . '/migrations/032_hide_day_notifications_navigation.sql',
     __DIR__ . '/seeders/015_ai_training_seed.sql',
 ] as $file) {
     $sql = file_get_contents($file);
