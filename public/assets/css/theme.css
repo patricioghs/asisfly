@@ -1274,6 +1274,37 @@ a {
   grid-template-columns: minmax(0, 1fr) repeat(2, minmax(160px, 0.42fr)) auto auto;
 }
 
+.ai-training-tabs {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.ai-training-tabs .btn {
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  white-space: normal;
+}
+
+.ai-training-active-section {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  scroll-margin-top: 18px;
+}
+
+.ai-training-active-section h2 {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin: 0;
+}
+
+.ai-training-active-section small {
+  color: var(--asisty-muted);
+  max-width: 420px;
+}
+
 .controls-shell {
   align-items: start;
   display: grid;

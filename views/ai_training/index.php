@@ -1,5 +1,5 @@
 <?php
-$section = $section ?? 'summary';
+$section = trim((string) ($section ?? 'summary'));
 $overview = $overview ?? [];
 $session = $overview['session'] ?? [];
 $profile = $overview['profile'] ?? [];
@@ -35,6 +35,10 @@ $tabs = [
     'settings' => ['Configuracion', 'bi-sliders'],
     'versions' => ['Versiones', 'bi-clock-history'],
 ];
+if (!isset($tabs[$section])) {
+    $section = 'summary';
+}
+$activeTab = $tabs[$section];
 $statusLabels = ['draft' => 'Borrador', 'review' => 'En revision', 'published' => 'Publicado', 'archived' => 'Archivado'];
 $toneLabels = ['formal' => 'Formal', 'professional' => 'Profesional', 'close' => 'Cercano', 'technical' => 'Tecnico', 'commercial' => 'Comercial'];
 $lengthLabels = ['short' => 'Breve', 'medium' => 'Media', 'detailed' => 'Detallada'];
@@ -49,8 +53,8 @@ $progress = (int) ($session['progress_percent'] ?? 0);
         <h2>Ensena a AsisFly como trabaja tu empresa</h2>
         <p>Construye el perfil, reglas, preguntas frecuentes y ejemplos que el trabajador virtual usara como contexto autorizado antes de responder.</p>
         <div class="controls-hero-actions">
-            <a class="btn btn-primary" href="<?= url('/ai-training?section=onboarding') ?>"><i class="bi bi-chat-dots"></i> Continuar entrevista</a>
-            <a class="btn btn-outline-secondary" href="<?= url('/ai-training?section=simulator') ?>"><i class="bi bi-stars"></i> Practicar respuesta</a>
+            <a class="btn btn-primary" href="<?= url('/ai-training?section=onboarding') ?>#training-content"><i class="bi bi-chat-dots"></i> Continuar entrevista</a>
+            <a class="btn btn-outline-secondary" href="<?= url('/ai-training?section=simulator') ?>#training-content"><i class="bi bi-stars"></i> Practicar respuesta</a>
         </div>
     </div>
     <div class="controls-command-card">
@@ -60,11 +64,19 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     </div>
 </section>
 
-<nav class="panel controls-filter-bar mt-4">
+<nav class="panel controls-filter-bar ai-training-tabs mt-4" aria-label="Secciones del Centro de Entrenamiento IA">
     <?php foreach ($tabs as $key => [$label, $icon]): ?>
-        <a class="btn <?= $section === $key ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= url('/ai-training?section=' . $key) ?>"><i class="bi <?= e($icon) ?>"></i><?= e($label) ?></a>
+        <a class="btn <?= $section === $key ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= url('/ai-training?section=' . $key) ?>#training-content"><i class="bi <?= e($icon) ?>"></i><?= e($label) ?></a>
     <?php endforeach; ?>
 </nav>
+
+<section id="training-content" class="panel ai-training-active-section mt-4" tabindex="-1">
+    <div>
+        <span class="eyebrow">Seccion activa</span>
+        <h2><i class="bi <?= e($activeTab[1]) ?>"></i><?= e($activeTab[0]) ?></h2>
+    </div>
+    <small>Completa esta parte para que AsisFly aprenda como vender, responder y operar en tu empresa.</small>
+</section>
 
 <?php if ($section === 'summary'): ?>
     <section class="workbench-metrics mt-4">
