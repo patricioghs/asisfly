@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS ai_brand_route_detections (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    company_id BIGINT UNSIGNED NOT NULL,
+    conversation_id BIGINT UNSIGNED NULL,
+    message_id BIGINT UNSIGNED NULL,
+    brand_route_id BIGINT UNSIGNED NULL,
+    brand_name VARCHAR(180) NULL,
+    target_company_name VARCHAR(180) NULL,
+    confidence TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    status ENUM('suggested','uncertain','none','confirmed','corrected','ignored') NOT NULL DEFAULT 'suggested',
+    reason TEXT NULL,
+    matched_terms_json JSON NULL,
+    source ENUM('passive','manual','system') NOT NULL DEFAULT 'passive',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ai_brand_route_detections_company_conversation (company_id, conversation_id),
+    INDEX idx_ai_brand_route_detections_company_status (company_id, status),
+    INDEX idx_ai_brand_route_detections_route (brand_route_id),
+    CONSTRAINT fk_ai_brand_route_detections_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ai_brand_route_detections_conversation FOREIGN KEY (conversation_id) REFERENCES inbox_conversations(id) ON DELETE SET NULL,
+    CONSTRAINT fk_ai_brand_route_detections_message FOREIGN KEY (message_id) REFERENCES inbox_messages(id) ON DELETE SET NULL,
+    CONSTRAINT fk_ai_brand_route_detections_route FOREIGN KEY (brand_route_id) REFERENCES ai_brand_routes(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

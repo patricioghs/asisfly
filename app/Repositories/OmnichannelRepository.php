@@ -12,6 +12,7 @@ use App\Services\AIResponseReviewService;
 use App\Services\OmnichannelCommercialAutomation;
 use App\Services\OmnichannelAiResponder;
 use App\Services\OmnichannelAutonomyPolicy;
+use App\Services\BrandRoutingDetector;
 use App\Services\SecretVault;
 use App\Services\SmtpMailer;
 use App\Services\WhatsAppCloudClient;
@@ -391,6 +392,8 @@ final class OmnichannelRepository
         if (!$inserted) {
             return ['ok' => true, 'conversation_id' => $conversationId, 'message' => 'Mensaje duplicado omitido.'];
         }
+
+        $this->detectBrandRoutePassive((int) $account['company_id'], $conversationId, $message);
         $decision = $this->superviseInboundConversation((int) $account['company_id'], $conversationId, $account, $message);
 
         return [
@@ -553,6 +556,16 @@ final class OmnichannelRepository
             return true;
         } catch (\Throwable) {
             return false;
+        }
+    }
+
+    private function detectBrandRoutePassive(int $companyId, int $conversationId, array $message): void
+    {
+        try {
+            $detector = new BrandRoutingDetector();
+            $detector->record($companyId, $conversationId, null, $detector->detect($companyId, $message));
+        } catch (\Throwable) {
+            // Brand routing is observational in this phase and must not affect Omnicanal.
         }
     }
 

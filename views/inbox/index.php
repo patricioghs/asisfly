@@ -143,6 +143,9 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                     <span class="ai-state-pill state-<?= e($conversation['ai_state'] ?? 'human_required') ?>"><i class="bi bi-cpu"></i><?= e($conversation['ai_state_label'] ?? 'Requiere supervision') ?></span>
                     <span class="priority priority-<?= e($conversation['priority']) ?>"><i class="bi <?= e($priorityIcons[$conversation['priority']] ?? 'bi-dot') ?>"></i><?= e($priorityOptions[$conversation['priority']] ?? $conversation['priority']) ?></span>
                     <span class="assignee-chip"><i class="bi bi-diagram-3"></i><?= e($brainLabels[$conversation['account_brain'] ?? ''] ?? 'General') ?></span>
+                    <?php if (!empty($conversation['brand_detection']['brand_name'])): ?>
+                        <span class="assignee-chip"><i class="bi bi-signpost-split"></i><?= e($conversation['brand_detection']['brand_name']) ?> · <?= e((string) $conversation['brand_detection']['confidence']) ?>%</span>
+                    <?php endif; ?>
                     <?= !empty($conversation['assigned_name']) ? '<span class="assignee-chip"><i class="bi bi-person"></i>' . e($conversation['assigned_name']) . '</span>' : '' ?>
                 </small>
                 <em><?= e($conversation['ai_activity'] ?? 'AsisFly reviso la conversacion') ?> - <?= e((string) ($conversation['ai_confidence'] ?? 0)) ?>% confianza</em>
@@ -174,6 +177,16 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                     <h3><?= e($selected['ai_activity'] ?? 'AsisFly reviso la conversacion') ?></h3>
                     <p><?= e($selected['ai_summary'] ?? '') ?></p>
                     <small><?= e($selected['ai_reason'] ?? '') ?></small>
+                    <?php if (!empty($selected['brand_detection']['brand_name'])): ?>
+                        <div class="supervision-decision-tags">
+                            <span><i class="bi bi-signpost-split"></i> Marca sugerida: <?= e($selected['brand_detection']['brand_name']) ?></span>
+                            <span><i class="bi bi-speedometer2"></i> <?= e((string) $selected['brand_detection']['confidence']) ?>% confianza</span>
+                            <?php if (!empty($selected['brand_detection']['target_company_name'])): ?>
+                                <span><i class="bi bi-building"></i> <?= e($selected['brand_detection']['target_company_name']) ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <small><?= e($selected['brand_detection']['reason'] ?? '') ?></small>
+                    <?php endif; ?>
                     <?php if (!empty($selected['ai_decision'])): ?>
                         <div class="supervision-decision-tags">
                             <span><i class="bi bi-shield-check"></i> Riesgo <?= e((string) ($selected['ai_decision']['risk'] ?? 'medio')) ?></span>
