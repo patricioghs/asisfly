@@ -32,6 +32,7 @@ final class InboxController extends Controller
             'metrics' => $repo->metrics($this->companyId()),
             'supervisionReport' => $repo->supervisionReport($this->companyId()),
             'accounts' => (new OmnichannelRepository())->accounts($this->companyId()),
+            'brandRoutes' => $repo->brandRoutes($this->companyId()),
         ]);
     }
 
@@ -71,6 +72,20 @@ final class InboxController extends Controller
         $this->requirePermission('chat.use');
         $conversationId = (int) ($_POST['conversation_id'] ?? 0);
         (new InboxRepository())->updateStatus($this->companyId(), $conversationId, (string) ($_POST['status'] ?? ''));
+        $this->redirect('/inbox?id=' . $conversationId);
+    }
+
+    public function brandRoute(): void
+    {
+        $this->requirePermission('chat.use');
+        $conversationId = (int) ($_POST['conversation_id'] ?? 0);
+        $result = (new InboxRepository())->confirmBrandRoute(
+            $this->companyId(),
+            $conversationId,
+            (int) ($_POST['brand_route_id'] ?? 0),
+            (int) ($_SESSION['user']['id'] ?? 0)
+        );
+        $_SESSION[!empty($result['ok']) ? 'flash_success' : 'flash_error'] = (string) ($result['message'] ?? 'No se pudo actualizar la marca.');
         $this->redirect('/inbox?id=' . $conversationId);
     }
 }

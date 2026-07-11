@@ -21,6 +21,7 @@ $decisionCounts = $supervisionReport['decisionCounts'] ?? [];
 $generatedCounts = $supervisionReport['generatedCounts'] ?? [];
 $channelSettings = $supervisionReport['channels'] ?? [];
 $recentContexts = $supervisionReport['recentContexts'] ?? [];
+$brandRoutes = $brandRoutes ?? [];
 $filterQuery = http_build_query(array_filter($filters ?? [], fn ($value) => $value !== ''));
 $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(array_filter([...($filters ?? []), ...$extra], fn ($value) => $value !== '')));
 ?>
@@ -186,6 +187,21 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                             <?php endif; ?>
                         </div>
                         <small><?= e($selected['brand_detection']['reason'] ?? '') ?></small>
+                    <?php endif; ?>
+                    <?php if ($brandRoutes): ?>
+                        <form method="post" action="<?= url('/inbox/brand-route') ?>" class="status-toolbar mt-3">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="conversation_id" value="<?= e((string) $selected['id']) ?>">
+                            <select class="form-select" name="brand_route_id" aria-label="Marca de la conversacion">
+                                <option value="">Seleccionar marca/negocio</option>
+                                <?php foreach ($brandRoutes as $route): ?>
+                                    <option value="<?= e((string) $route['id']) ?>" <?= (int) ($selected['brand_detection']['route_id'] ?? 0) === (int) $route['id'] ? 'selected' : '' ?>>
+                                        <?= e($route['brand_name']) ?><?= !empty($route['target_company_name']) ? ' / ' . e($route['target_company_name']) : '' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button class="btn btn-outline-primary"><i class="bi bi-check2-circle"></i> Confirmar marca</button>
+                        </form>
                     <?php endif; ?>
                     <?php if (!empty($selected['ai_decision'])): ?>
                         <div class="supervision-decision-tags">

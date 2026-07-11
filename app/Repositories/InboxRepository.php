@@ -7,6 +7,7 @@ namespace App\Repositories;
 use App\Core\Database;
 use App\Repositories\AutonomyRepository;
 use App\Services\AIResponseReviewService;
+use App\Services\BrandRoutingDetector;
 use App\Services\OmnichannelAiResponder;
 use PDO;
 
@@ -161,6 +162,20 @@ final class InboxRepository
             'channels' => $this->channelAutonomySettings($companyId),
             'recentContexts' => $this->recentContextLogs($companyId),
         ];
+    }
+
+    public function brandRoutes(int $companyId): array
+    {
+        return (new BrandRoutingDetector())->activeRoutes($companyId);
+    }
+
+    public function confirmBrandRoute(int $companyId, int $conversationId, int $routeId, int $userId): array
+    {
+        if (!$this->databaseReady() || $conversationId <= 0 || $routeId <= 0) {
+            return ['ok' => false, 'message' => 'Selecciona una conversacion y una marca valida.'];
+        }
+
+        return (new BrandRoutingDetector())->confirmRoute($companyId, $conversationId, $routeId, $userId);
     }
 
     public function suggestReply(int $companyId, int $conversationId, int $userId): void
@@ -568,39 +583,7 @@ final class InboxRepository
 
     private function brandDetection(int $companyId, int $conversationId): ?array
     {
-        if ($conversationId <= 0) {
-            return null;
-        }
-
-        try {
-            $statement = Database::connection()->prepare(
-                'SELECT d.*, r.brand_name AS configured_brand_name, r.target_company_name AS configured_target_company_name
-                 FROM ai_brand_route_detections d
-                 LEFT JOIN ai_brand_routes r ON r.id = d.brand_route_id AND r.company_id = d.company_id
-                 WHERE d.company_id = :company_id AND d.conversation_id = :conversation_id
-                 ORDER BY d.id DESC
-                 LIMIT 1'
-            );
-            $statement->execute(['company_id' => $companyId, 'conversation_id' => $conversationId]);
-            $row = $statement->fetch(PDO::FETCH_ASSOC);
-            if (!$row) {
-                return null;
-            }
-
-            $terms = json_decode((string) ($row['matched_terms_json'] ?? '[]'), true);
-
-            return [
-                'brand_name' => (string) (($row['configured_brand_name'] ?? '') ?: ($row['brand_name'] ?? '')),
-                'target_company_name' => (string) (($row['configured_target_company_name'] ?? '') ?: ($row['target_company_name'] ?? '')),
-                'confidence' => (int) ($row['confidence'] ?? 0),
-                'status' => (string) ($row['status'] ?? 'none'),
-                'reason' => (string) ($row['reason'] ?? ''),
-                'matched_terms' => is_array($terms) ? $terms : [],
-                'created_at' => (string) ($row['created_at'] ?? ''),
-            ];
-        } catch (\Throwable) {
-            return null;
-        }
+        return (new BrandRoutingDetector())->latestForConversation($companyId, $conversationId);
     }
 
     private function decisionTimeline(int $companyId, int $conversationId): array
@@ -723,6 +706,7 @@ final class InboxRepository
             'subject' => (string) ($conversation['subject'] ?? 'Nueva conversacion'),
             'body' => $lastInbound,
             'priority' => (string) ($conversation['priority'] ?? 'medium'),
+            'brand_route' => $conversation['brand_detection'] ?? null,
         ];
     }
 

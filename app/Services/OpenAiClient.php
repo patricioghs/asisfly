@@ -98,6 +98,7 @@ final class OpenAiClient
             'Pais: ' . ($company['country'] ?? 'LatAm') . '. Moneda: ' . ($company['currency'] ?? 'USD') . '.',
             'Fecha y hora actual del sistema: ' . $now->format('Y-m-d H:i:s') . ' (' . $timezone . '). Usa esta fecha para responder preguntas sobre hoy, manana o ayer.',
             'Cerebro activo: ' . ($route['name'] ?? 'Cerebro Ejecutivo') . '. Modulo: ' . ($route['module'] ?? 'Direccion') . '.',
+            $this->brandRoutePrompt($route['brand_route'] ?? null),
             $this->abilityPrompt($aiContext),
             $this->toolPrompt($aiContext),
             $this->planPrompt($aiContext),
@@ -130,6 +131,22 @@ final class OpenAiClient
         }
 
         return $messages;
+    }
+
+    private function brandRoutePrompt(mixed $brandRoute): ?string
+    {
+        if (!is_array($brandRoute) || empty($brandRoute['brand_name'])) {
+            return null;
+        }
+
+        return implode("\n", array_filter([
+            'Contexto de marca para esta conversacion:',
+            '- Marca/negocio: ' . (string) $brandRoute['brand_name'],
+            !empty($brandRoute['target_company_name']) ? '- Empresa/linea asociada: ' . (string) $brandRoute['target_company_name'] : null,
+            '- Confianza de enrutamiento: ' . (string) ($brandRoute['confidence'] ?? 0) . '%',
+            !empty($brandRoute['status']) ? '- Estado: ' . (string) $brandRoute['status'] : null,
+            'No mezcles informacion de otras marcas. Si el cliente no deja claro de que negocio habla, pregunta antes de responder con datos especificos.',
+        ]));
     }
 
     private function abilityPrompt(array $context): string

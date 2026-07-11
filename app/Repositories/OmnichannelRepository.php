@@ -581,6 +581,16 @@ final class OmnichannelRepository
         return $row ?: null;
     }
 
+    private function messageWithBrandRoute(int $companyId, int $conversationId, array $message): array
+    {
+        $brandRoute = (new BrandRoutingDetector())->latestForConversation($companyId, $conversationId);
+        if ($brandRoute) {
+            $message['brand_route'] = $brandRoute;
+        }
+
+        return $message;
+    }
+
     private function decryptCredentials(array $account): ?array
     {
         $json = (new SecretVault())->decrypt($account['encrypted_credentials'] ?? null);
@@ -1100,6 +1110,7 @@ final class OmnichannelRepository
             return ['mode' => 'human_required', 'message' => 'AsisFly derivo la conversacion a supervision humana.'];
         }
 
+        $message = $this->messageWithBrandRoute($companyId, $conversationId, $message);
         $aiDraft = (new OmnichannelAiResponder())->draft(
             $companyId,
             $account,

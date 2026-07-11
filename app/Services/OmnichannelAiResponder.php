@@ -21,6 +21,10 @@ final class OmnichannelAiResponder
         $company = $this->company($companyId);
         $assistant = $tenantRepo->assistant($companyId);
         $route = $this->routeForAccount($account);
+        $brandRoute = is_array($message['brand_route'] ?? null) ? $message['brand_route'] : [];
+        if ($brandRoute) {
+            $route['brand_route'] = $brandRoute;
+        }
         $prompt = $this->prompt($account, $message, $decision, $history);
         $estimatedPromptTokens = $this->estimateTokens($prompt) + 680;
         $limit = $settingsRepo->canUseAi($companyId, $estimatedPromptTokens + 450, $settings);
@@ -111,6 +115,7 @@ final class OmnichannelAiResponder
             'metadata' => [
                 'channel' => $account['channel'] ?? null,
                 'account_id' => $account['id'] ?? null,
+                'brand_route' => $brandRoute,
                 'decision' => $decision,
                 'memory_hits' => count($memory),
                 'knowledge_hits' => count($knowledgeSources),
@@ -145,6 +150,7 @@ final class OmnichannelAiResponder
             'knowledge_hits' => count($knowledgeSources),
             'context_log_id' => $contextLogId,
             'generated_response_id' => $generatedResponseId,
+            'brand_route' => $brandRoute,
             'confidence' => (int) ($decision['confidence'] ?? 0),
         ];
     }
@@ -164,8 +170,25 @@ final class OmnichannelAiResponder
             'Asunto: ' . ($message['subject'] ?? 'Nueva conversacion') . '.',
             'Mensaje recibido: ' . ($message['body'] ?? ''),
             'Decision IA: riesgo ' . ($decision['risk'] ?? 'medium') . ', confianza ' . ($decision['confidence'] ?? 0) . '%, modo ' . ($decision['mode'] ?? 'approval_required') . '.',
+            $this->brandRoutePrompt($message['brand_route'] ?? null),
             $recent ? 'Historial reciente:' . "\n" . implode("\n", $recent) : null,
             'Objetivo: responder de forma util, breve y comercialmente segura. Si falta informacion, pedir el dato exacto y no inventar precios, stock, plazos ni descuentos.',
+        ]));
+    }
+
+    private function brandRoutePrompt(mixed $brandRoute): ?string
+    {
+        if (!is_array($brandRoute) || empty($brandRoute['brand_name'])) {
+            return null;
+        }
+
+        return implode("\n", array_filter([
+            'Marca/negocio confirmado o sugerido para esta conversacion:',
+            '- Marca: ' . (string) $brandRoute['brand_name'],
+            !empty($brandRoute['target_company_name']) ? '- Empresa/linea: ' . (string) $brandRoute['target_company_name'] : null,
+            '- Confianza: ' . (string) ($brandRoute['confidence'] ?? 0) . '%',
+            !empty($brandRoute['status']) ? '- Estado de enrutamiento: ' . (string) $brandRoute['status'] : null,
+            'Usa este contexto para adaptar tono, productos, agenda y respuesta. Si la marca no esta confirmada o el mensaje es ambiguo, pide aclaracion antes de asumir.',
         ]));
     }
 

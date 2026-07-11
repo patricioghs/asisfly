@@ -67,6 +67,7 @@ $router->post('/inbox/draft', [InboxController::class, 'saveDraft']);
 $router->post('/inbox/send-draft', [InboxController::class, 'sendDraft']);
 $router->post('/inbox/assign-human', [InboxController::class, 'assignHuman']);
 $router->post('/inbox/status', [InboxController::class, 'status']);
+$router->post('/inbox/brand-route', [InboxController::class, 'brandRoute']);
 $router->get('/chat', [ChatController::class, 'index']);
 $router->post('/chat', [ChatController::class, 'ask']);
 $router->get('/tasks', [AssistantWorkspaceController::class, 'tasks']);
