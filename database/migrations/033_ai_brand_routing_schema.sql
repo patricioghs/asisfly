@@ -1,0 +1,43 @@
+CREATE TABLE IF NOT EXISTS ai_brand_routes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT UNSIGNED NOT NULL,
+  brand_name VARCHAR(180) NOT NULL,
+  target_company_id BIGINT UNSIGNED NULL,
+  target_company_name VARCHAR(180) NULL,
+  description TEXT NULL,
+  keywords TEXT NULL,
+  products_services TEXT NULL,
+  typical_phrases TEXT NULL,
+  channels VARCHAR(255) NULL,
+  priority TINYINT UNSIGNED NOT NULL DEFAULT 50,
+  status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_by BIGINT UNSIGNED NULL,
+  updated_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ai_brand_routes_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_brand_routes_target_company FOREIGN KEY (target_company_id) REFERENCES companies(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_brand_routes_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_brand_routes_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_ai_brand_routes_company_status (company_id, status, priority),
+  FULLTEXT idx_ai_brand_routes_text (brand_name, description, keywords, products_services, typical_phrases)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_routing_settings (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  shared_channels VARCHAR(255) NULL,
+  ambiguous_action ENUM('ask_customer','human_review','default_brand') NOT NULL DEFAULT 'ask_customer',
+  min_confidence TINYINT UNSIGNED NOT NULL DEFAULT 70,
+  default_brand_route_id BIGINT UNSIGNED NULL,
+  status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_by BIGINT UNSIGNED NULL,
+  updated_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ai_routing_settings_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_routing_settings_default_brand FOREIGN KEY (default_brand_route_id) REFERENCES ai_brand_routes(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_routing_settings_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_routing_settings_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_ai_routing_settings_company_status (company_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

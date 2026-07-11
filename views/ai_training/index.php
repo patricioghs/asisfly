@@ -31,6 +31,14 @@ $knowledgeStats = $overview['knowledgeStats'] ?? ['sources' => 0, 'ready' => 0, 
 $knowledgeQuery = $overview['knowledgeQuery'] ?? '';
 $knowledgeResults = $overview['knowledgeResults'] ?? [];
 $responseReviews = $overview['responseReviews'] ?? [];
+$brandRoutes = $overview['brandRoutes'] ?? [];
+$routingSettings = $overview['routingSettings'] ?? [
+    'shared_channels' => 'WhatsApp principal',
+    'ambiguous_action' => 'ask_customer',
+    'min_confidence' => 70,
+    'default_brand_route_id' => null,
+    'status' => 'active',
+];
 $questions = $questions ?? [];
 $answersByKey = $answersByKey ?? [];
 $simulation = $simulation ?? null;
@@ -45,6 +53,7 @@ $tabs = [
     'documents' => ['Documentos', 'bi-file-earmark-text'],
     'examples' => ['Ejemplos', 'bi-chat-square-quote'],
     'corrections' => ['Correcciones', 'bi-pencil-square'],
+    'routing' => ['Marcas y enrutamiento', 'bi-signpost-split'],
     'simulator' => ['Simulador', 'bi-stars'],
     'settings' => ['Configuracion', 'bi-sliders'],
     'versions' => ['Versiones', 'bi-clock-history'],
@@ -59,6 +68,8 @@ $toneLabels = ['formal' => 'Formal', 'professional' => 'Profesional', 'close' =>
 $lengthLabels = ['short' => 'Breve', 'medium' => 'Media', 'detailed' => 'Detallada'];
 $priorityLabels = ['low' => 'Baja', 'medium' => 'Media', 'high' => 'Alta', 'critical' => 'Critica'];
 $modeLabels = ['manual' => 'Manual', 'assisted' => 'Asistido', 'automatic' => 'Automatico'];
+$routeStatusLabels = ['active' => 'Activa', 'inactive' => 'Inactiva'];
+$ambiguousActionLabels = ['ask_customer' => 'Preguntar al cliente', 'human_review' => 'Enviar a revision humana', 'default_brand' => 'Usar marca por defecto'];
 $progress = (int) ($session['progress_percent'] ?? 0);
 ?>
 
@@ -106,6 +117,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
             <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('rules')) ?>"><i class="bi bi-shield-check"></i> Reglas</a>
             <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('faqs')) ?>"><i class="bi bi-question-circle"></i> FAQs</a>
             <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('documents')) ?>"><i class="bi bi-file-earmark-text"></i> Documentos</a>
+            <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('routing')) ?>"><i class="bi bi-signpost-split"></i> Marcas y enrutamiento</a>
         </div>
     </section>
 
@@ -461,6 +473,75 @@ $progress = (int) ($session['progress_percent'] ?? 0);
                 <p class="task-muted">El simulador usara perfil publicado, reglas, FAQs, productos, ejemplos y memoria documental de esta empresa.</p>
             <?php endif; ?>
         </article>
+    </section>
+<?php endif; ?>
+
+<?php if ($section === 'routing'): ?>
+    <section class="workbench-metrics mt-4">
+        <article class="metric-card"><span>Marcas activas</span><strong><?= e((string) count(array_filter($brandRoutes, fn (array $route): bool => ($route['status'] ?? '') === 'active'))) ?></strong><small>Disponibles para clasificacion futura</small></article>
+        <article class="metric-card"><span>Canales compartidos</span><strong><?= e((string) ($routingSettings['shared_channels'] ?? 'WhatsApp')) ?></strong><small>Donde llega todo junto</small></article>
+        <article class="metric-card"><span>Confianza minima</span><strong><?= e((string) ($routingSettings['min_confidence'] ?? 70)) ?>%</strong><small>Para sugerir marca</small></article>
+        <article class="metric-card"><span>Si hay duda</span><strong><?= e($ambiguousActionLabels[$routingSettings['ambiguous_action'] ?? 'ask_customer'] ?? 'Preguntar') ?></strong><small>Modo seguro inicial</small></article>
+    </section>
+
+    <section class="controls-detail-grid mt-4">
+        <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/brand-route') ?>">
+            <?= csrf_field() ?>
+            <div class="panel-title"><div><span class="eyebrow">Nueva marca</span><h2>Ensena a AsisFly a reconocer una empresa o linea de negocio</h2></div></div>
+            <input class="form-control" name="brand_name" placeholder="Ej: Tilo, ObraOK, AsisFly, Tienda de enmarcaciones" required>
+            <input class="form-control" name="target_company_name" placeholder="Empresa o marca destino">
+            <textarea class="form-control" name="description" rows="3" placeholder="Que hace esta marca y que tipo de consultas deberia atender"></textarea>
+            <textarea class="form-control" name="keywords" rows="3" placeholder="Palabras clave separadas por coma: catalogo, ecommerce, pedido, obra, presupuesto..."></textarea>
+            <textarea class="form-control" name="products_services" rows="3" placeholder="Productos o servicios que identifican esta marca"></textarea>
+            <textarea class="form-control" name="typical_phrases" rows="3" placeholder="Frases tipicas de clientes: quiero cotizar una obra, necesito catalogo, cuanto sale enmarcar..."></textarea>
+            <div class="control-create-grid">
+                <input class="form-control" name="channels" value="WhatsApp principal" placeholder="Canales compartidos">
+                <input class="form-control" type="number" name="priority" min="1" max="100" value="50" placeholder="Prioridad">
+            </div>
+            <select class="form-select" name="status">
+                <?php foreach ($routeStatusLabels as $value => $label): ?><option value="<?= e($value) ?>"><?= e($label) ?></option><?php endforeach; ?>
+            </select>
+            <button class="btn btn-primary"><i class="bi bi-plus-lg"></i>Agregar marca</button>
+        </form>
+
+        <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/routing-settings') ?>">
+            <?= csrf_field() ?>
+            <div class="panel-title"><div><span class="eyebrow">Reglas del enrutador</span><h2>Que debe hacer AsisFly cuando recibe todo junto</h2></div></div>
+            <input class="form-control" name="shared_channels" value="<?= e((string) ($routingSettings['shared_channels'] ?? 'WhatsApp principal')) ?>" placeholder="Ej: WhatsApp principal, Gmail ventas">
+            <select class="form-select" name="ambiguous_action">
+                <?php foreach ($ambiguousActionLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= ($routingSettings['ambiguous_action'] ?? 'ask_customer') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
+            </select>
+            <input class="form-control" name="min_confidence" type="number" min="0" max="100" value="<?= e((string) ($routingSettings['min_confidence'] ?? 70)) ?>" placeholder="Confianza minima">
+            <select class="form-select" name="default_brand_route_id">
+                <option value="">Sin marca por defecto</option>
+                <?php foreach ($brandRoutes as $route): ?>
+                    <option value="<?= e((string) $route['id']) ?>" <?= (string) ($routingSettings['default_brand_route_id'] ?? '') === (string) $route['id'] ? 'selected' : '' ?>><?= e((string) $route['brand_name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select class="form-select" name="status">
+                <?php foreach ($routeStatusLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= ($routingSettings['status'] ?? 'active') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
+            </select>
+            <p class="task-muted mb-0">Fase 1: esto solo guarda la configuracion. En la fase pasiva Omnicanal mostrara marca sugerida, confianza y motivo sin cambiar respuestas automaticamente.</p>
+            <button class="btn btn-primary"><i class="bi bi-save"></i>Guardar enrutamiento</button>
+        </form>
+    </section>
+
+    <section class="panel mt-4">
+        <div class="panel-title"><div><span class="eyebrow">Marcas configuradas</span><h2>Mapa actual para futuros mensajes omnicanal</h2></div><span class="soft-badge"><?= e((string) count($brandRoutes)) ?> marcas</span></div>
+        <div class="control-entry-list">
+            <?php foreach ($brandRoutes as $route): ?>
+                <div>
+                    <strong><?= e((string) $route['brand_name']) ?> <span class="soft-badge"><?= e($routeStatusLabels[$route['status']] ?? $route['status']) ?></span></strong>
+                    <span><?= e((string) ($route['target_company_name'] ?: 'Sin empresa destino definida')) ?> · <?= e((string) ($route['channels'] ?: 'Todos los canales')) ?> · prioridad <?= e((string) $route['priority']) ?></span>
+                    <small><?= e((string) ($route['description'] ?: 'Sin descripcion')) ?></small>
+                    <?php if (!empty($route['keywords'])): ?><small><strong>Claves:</strong> <?= e((string) $route['keywords']) ?></small><?php endif; ?>
+                    <?php if (!empty($route['typical_phrases'])): ?><small><strong>Frases:</strong> <?= e((string) $route['typical_phrases']) ?></small><?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+            <?php if (!$brandRoutes): ?>
+                <p class="task-muted">Aun no hay marcas. Agrega Tilo, ObraOK, AsisFly u otra linea de negocio para preparar el enrutamiento inteligente.</p>
+            <?php endif; ?>
+        </div>
     </section>
 <?php endif; ?>
 

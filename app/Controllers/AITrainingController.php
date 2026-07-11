@@ -68,6 +68,11 @@ final class AITrainingController extends Controller
         $this->show('corrections');
     }
 
+    public function routing(): void
+    {
+        $this->show('routing');
+    }
+
     public function simulator(): void
     {
         $this->show('simulator');
@@ -222,6 +227,31 @@ final class AITrainingController extends Controller
             'Modo de operacion por canal actualizado.'
         );
         $this->redirect('/ai-training?section=settings');
+    }
+
+    public function addBrandRoute(): void
+    {
+        $this->requireTrainingAccess('ai_training.edit');
+        if (trim((string) ($_POST['brand_name'] ?? '')) === '') {
+            $_SESSION['flash_error'] = 'Ingresa el nombre de la marca o empresa.';
+            $this->redirect('/ai-training?section=routing');
+        }
+
+        $this->runTrainingAction(
+            fn (): mixed => (new AITrainingRepository())->addBrandRoute($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $_POST),
+            'Marca agregada al enrutador. En esta fase solo se usara como configuracion visible.'
+        );
+        $this->redirect('/ai-training?section=routing');
+    }
+
+    public function saveRoutingSettings(): void
+    {
+        $this->requireTrainingAccess('ai_training.edit');
+        $this->runTrainingAction(
+            fn (): mixed => (new AITrainingRepository())->saveRoutingSettings($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $_POST),
+            'Configuracion de enrutamiento guardada.'
+        );
+        $this->redirect('/ai-training?section=routing');
     }
 
     public function uploadDocument(): void

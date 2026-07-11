@@ -56,6 +56,7 @@ foreach ([
     __DIR__ . '/migrations/029_ai_training_schema.sql',
     __DIR__ . '/migrations/030_ai_training_knowledge_schema.sql',
     __DIR__ . '/migrations/031_ai_channel_autonomy_defaults.sql',
+    __DIR__ . '/migrations/033_ai_brand_routing_schema.sql',
     __DIR__ . '/seeders/002_demo_data.sql',
     __DIR__ . '/seeders/003_brains_data.sql',
     __DIR__ . '/seeders/004_social_data.sql',

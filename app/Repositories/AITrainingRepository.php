@@ -39,6 +39,8 @@ final class AITrainingRepository
             'knowledgeQuery' => trim((string) ($_GET['knowledge_q'] ?? '')),
             'knowledgeResults' => $this->knowledgeResults($companyId, trim((string) ($_GET['knowledge_q'] ?? '')), 8),
             'responseReviews' => $this->responseReviews($companyId, 12),
+            'brandRoutes' => $this->brandRoutes($companyId, 20),
+            'routingSettings' => $this->routingSettings($companyId),
         ];
     }
 
@@ -291,6 +293,56 @@ final class AITrainingRepository
         ]);
     }
 
+    public function addBrandRoute(int $companyId, int $userId, array $input): void
+    {
+        $this->ensureRoutingReady();
+        if (trim((string) ($input['brand_name'] ?? '')) === '') {
+            throw new RuntimeException('El nombre de la marca o empresa es obligatorio.');
+        }
+
+        Database::connection()->prepare(
+            'INSERT INTO ai_brand_routes
+             (company_id, brand_name, target_company_name, description, keywords, products_services, typical_phrases, channels, priority, status, created_by, updated_by)
+             VALUES (:company_id, :brand_name, :target_company_name, :description, :keywords, :products_services, :typical_phrases, :channels, :priority, :status, :user_id, :user_id)'
+        )->execute([
+            'company_id' => $companyId,
+            'brand_name' => $this->text($input, 'brand_name', 180),
+            'target_company_name' => $this->text($input, 'target_company_name', 180),
+            'description' => $this->text($input, 'description', 5000),
+            'keywords' => $this->text($input, 'keywords', 5000),
+            'products_services' => $this->text($input, 'products_services', 5000),
+            'typical_phrases' => $this->text($input, 'typical_phrases', 5000),
+            'channels' => $this->text($input, 'channels', 255) ?: 'WhatsApp principal',
+            'priority' => max(1, min(100, (int) ($input['priority'] ?? 50))),
+            'status' => $this->allowed($input['status'] ?? 'active', ['active', 'inactive'], 'active'),
+            'user_id' => $userId ?: null,
+        ]);
+    }
+
+    public function saveRoutingSettings(int $companyId, int $userId, array $input): void
+    {
+        $this->ensureRoutingReady();
+        $defaultBrandId = (int) ($input['default_brand_route_id'] ?? 0);
+        if ($defaultBrandId > 0 && !$this->brandRouteBelongsToCompany($companyId, $defaultBrandId)) {
+            $defaultBrandId = 0;
+        }
+
+        Database::connection()->prepare(
+            'INSERT INTO ai_routing_settings
+             (company_id, shared_channels, ambiguous_action, min_confidence, default_brand_route_id, status, created_by, updated_by)
+             VALUES (:company_id, :shared_channels, :ambiguous_action, :min_confidence, :default_brand_route_id, :status, :user_id, :user_id)
+             ON DUPLICATE KEY UPDATE shared_channels = VALUES(shared_channels), ambiguous_action = VALUES(ambiguous_action), min_confidence = VALUES(min_confidence), default_brand_route_id = VALUES(default_brand_route_id), status = VALUES(status), updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP'
+        )->execute([
+            'company_id' => $companyId,
+            'shared_channels' => $this->text($input, 'shared_channels', 255) ?: 'WhatsApp principal',
+            'ambiguous_action' => $this->allowed($input['ambiguous_action'] ?? 'ask_customer', ['ask_customer', 'human_review', 'default_brand'], 'ask_customer'),
+            'min_confidence' => max(0, min(100, (int) ($input['min_confidence'] ?? 70))),
+            'default_brand_route_id' => $defaultBrandId > 0 ? $defaultBrandId : null,
+            'status' => $this->allowed($input['status'] ?? 'active', ['active', 'inactive'], 'active'),
+            'user_id' => $userId ?: null,
+        ]);
+    }
+
     public function trainingContext(int $companyId, string $query = '', int $limit = 5): array
     {
         if (!$this->ready()) {
@@ -308,6 +360,8 @@ final class AITrainingRepository
             'reviews' => $this->reviewExamples($companyId, $limit),
             'knowledge' => $this->knowledgeResults($companyId, $query, $limit),
             'channels' => $this->channelSettings($companyId),
+            'brand_routes' => $this->brandRoutes($companyId, $limit),
+            'routing_settings' => $this->routingSettings($companyId),
             'prompt' => $this->activePrompt(),
         ];
     }
@@ -523,6 +577,34 @@ final class AITrainingRepository
         return $this->rows('SELECT * FROM ai_channel_settings WHERE company_id = :company_id ORDER BY FIELD(channel, "whatsapp", "email", "instagram", "facebook", "all"), channel', ['company_id' => $companyId]);
     }
 
+    private function brandRoutes(int $companyId, int $limit): array
+    {
+        if (!$this->routingReady()) {
+            return [];
+        }
+
+        return $this->rows('SELECT * FROM ai_brand_routes WHERE company_id = :company_id ORDER BY FIELD(status, "active", "inactive"), priority DESC, id DESC LIMIT ' . max(1, min(50, $limit)), ['company_id' => $companyId]);
+    }
+
+    private function routingSettings(int $companyId): array
+    {
+        $default = [
+            'shared_channels' => 'WhatsApp principal',
+            'ambiguous_action' => 'ask_customer',
+            'min_confidence' => 70,
+            'default_brand_route_id' => null,
+            'status' => 'active',
+        ];
+
+        if (!$this->routingReady()) {
+            return $default;
+        }
+
+        $statement = Database::connection()->prepare('SELECT * FROM ai_routing_settings WHERE company_id = :company_id LIMIT 1');
+        $statement->execute(['company_id' => $companyId]);
+        return $statement->fetch(PDO::FETCH_ASSOC) ?: $default;
+    }
+
     private function activePrompt(): array
     {
         $statement = Database::connection()->query('SELECT t.template_key, t.name, v.version, v.body, v.activated_at FROM ai_prompt_templates t INNER JOIN ai_prompt_versions v ON v.template_id = t.id WHERE t.template_key = "tenant_worker_base" AND v.status = "active" ORDER BY v.id DESC LIMIT 1');
@@ -628,6 +710,11 @@ final class AITrainingRepository
         return (int) $statement->fetchColumn();
     }
 
+    private function brandRouteBelongsToCompany(int $companyId, int $brandRouteId): bool
+    {
+        return $this->scalar('SELECT COUNT(*) FROM ai_brand_routes WHERE company_id = :company_id AND id = :id', ['company_id' => $companyId, 'id' => $brandRouteId]) > 0;
+    }
+
     private function ready(): bool
     {
         try {
@@ -644,6 +731,24 @@ final class AITrainingRepository
     {
         if (!$this->ready()) {
             throw new RuntimeException('El esquema de Entrenamiento IA no esta instalado. Ejecuta database/upgrade_abilities.php.');
+        }
+    }
+
+    private function routingReady(): bool
+    {
+        try {
+            Database::connection()->query('SELECT 1 FROM ai_brand_routes LIMIT 1');
+            Database::connection()->query('SELECT 1 FROM ai_routing_settings LIMIT 1');
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function ensureRoutingReady(): void
+    {
+        if (!$this->routingReady()) {
+            throw new RuntimeException('La migracion de marcas y enrutamiento no esta instalada.');
         }
     }
 
@@ -667,6 +772,14 @@ final class AITrainingRepository
             'knowledgeStats' => ['sources' => 0, 'ready' => 0, 'failed' => 0, 'chunks' => 0],
             'knowledgeQuery' => '',
             'knowledgeResults' => [],
+            'brandRoutes' => [],
+            'routingSettings' => [
+                'shared_channels' => 'WhatsApp principal',
+                'ambiguous_action' => 'ask_customer',
+                'min_confidence' => 70,
+                'default_brand_route_id' => null,
+                'status' => 'active',
+            ],
         ];
     }
 
