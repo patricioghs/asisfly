@@ -160,6 +160,8 @@ $router->get('/admin/plans', [SuperadminController::class, 'plans']);
 $router->get('/admin/ai-tokens', [SuperadminController::class, 'aiTokens']);
 $router->post('/admin/ai-tokens/platform-openai-key', [SuperadminController::class, 'savePlatformOpenAiKey']);
 $router->post('/admin/ai-tokens/platform-openai-key/delete', [SuperadminController::class, 'deletePlatformOpenAiKey']);
+$router->post('/admin/ai-tokens/platform-whatsapp-key', [SuperadminController::class, 'savePlatformWhatsAppKey']);
+$router->post('/admin/ai-tokens/platform-whatsapp-key/delete', [SuperadminController::class, 'deletePlatformWhatsAppKey']);
 $router->post('/admin/ai-tokens/openai-key', [SuperadminController::class, 'saveOpenAiKey']);
 $router->post('/admin/ai-tokens/openai-key/delete', [SuperadminController::class, 'deleteOpenAiKey']);
 $router->get('/admin/audit-logs', [SuperadminController::class, 'auditLogs']);

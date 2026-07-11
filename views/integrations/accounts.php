@@ -259,20 +259,16 @@ $whatsAppWebhookUrl = $webhookHost !== '' ? $scheme . '://' . $webhookHost . url
                     <details class="account-details">
                         <summary><span><?= $hasCredentials ? 'Actualizar WhatsApp Cloud API' : 'Configurar WhatsApp Cloud API' ?></span><i class="bi bi-chevron-down"></i></summary>
                         <div class="account-token">
-                            <span>Webhook Meta</span>
-                            <code><?= e($whatsAppWebhookUrl) ?></code>
-                        </div>
-                        <div class="account-token">
-                            <span>Verify token</span>
-                            <code><?= e((string) ($account['webhook_token'] ?? '')) ?></code>
+                            <span>Conexion administrada</span>
+                            <code>El token de Meta lo administra AsisFly desde Superadmin.</code>
                         </div>
                         <form class="account-card-form" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
                             <?= csrf_field() ?>
                             <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
                             <div class="account-form-row">
                                 <label>
-                                    <span>Phone Number ID</span>
-                                    <input class="form-control" name="phone_number_id" value="<?= e((string) ($credential['phone_number_id'] ?? $account['external_account_id'] ?? '')) ?>" placeholder="ID del numero en Meta" required>
+                                    <span>Numero WhatsApp / Phone Number ID</span>
+                                    <input class="form-control" name="phone_number_id" value="<?= e((string) ($credential['phone_number_id'] ?? $account['external_account_id'] ?? '')) ?>" placeholder="569..." required>
                                 </label>
                                 <label>
                                     <span>Business Account ID</span>
@@ -288,13 +284,14 @@ $whatsAppWebhookUrl = $webhookHost !== '' ? $scheme . '://' . $webhookHost . url
                                         <?php endforeach; ?>
                                     </select>
                                 </label>
-                                <label>
-                                    <span>Access token</span>
-                                    <input class="form-control" type="password" name="access_token" placeholder="<?= $hasCredentials ? 'Dejar vacio mantiene el token actual' : 'Token permanente de Meta' ?>" autocomplete="new-password">
-                                </label>
+                                <input type="hidden" name="access_token" value="">
                             </div>
-                            <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar WhatsApp Cloud</button>
+                            <button class="btn btn-outline-primary w-100"><i class="bi bi-whatsapp"></i> Guardar numero WhatsApp</button>
                         </form>
+                        <div class="account-token">
+                            <span>Datos tecnicos para Meta</span>
+                            <code>Webhook: <?= e($whatsAppWebhookUrl) ?> | Verify token: <?= e((string) ($account['webhook_token'] ?? '')) ?></code>
+                        </div>
                     </details>
                 <?php elseif ($account['provider'] === 'obraok'): ?>
                     <details class="account-details">

@@ -81,6 +81,7 @@ final class SuperadminController extends Controller
             'description' => 'Claves API administradas por Superadmin, consumo global de IA, modelos, costos estimados y limites por empresa.',
             'cards' => (new TenantRepository())->aiUsage($this->companyId()),
             'platformCredential' => $aiRepo->platformCredentialStatus('openai'),
+            'whatsappCredential' => $aiRepo->platformCredentialStatus('whatsapp_cloud'),
             'credentials' => $aiRepo->companyCredentialStatus(),
             'type' => 'usage',
         ]);
@@ -112,6 +113,35 @@ final class SuperadminController extends Controller
 
         (new AiProviderRepository())->forgetPlatformApiKey('openai');
         $_SESSION['flash_success'] = 'Clave global OpenAI eliminada.';
+        $this->redirect('/admin/ai-tokens');
+    }
+
+    public function savePlatformWhatsAppKey(): void
+    {
+        $this->requirePermission('*');
+
+        $apiKey = $this->normalizeMetaToken((string) ($_POST['whatsapp_api_key'] ?? ''));
+        if (!$this->isValidMetaToken($apiKey)) {
+            $_SESSION['flash_error'] = 'Ingresa un access token valido de Meta/WhatsApp.';
+            $this->redirect('/admin/ai-tokens');
+        }
+
+        try {
+            (new AiProviderRepository())->savePlatformApiKey('whatsapp_cloud', $apiKey, (int) ($_SESSION['user']['id'] ?? 0));
+            $_SESSION['flash_success'] = 'Token global WhatsApp guardado. Las empresas lo usaran sin ver credenciales tecnicas.';
+        } catch (Throwable $exception) {
+            $_SESSION['flash_error'] = 'No se pudo guardar el token global WhatsApp: ' . $exception->getMessage();
+        }
+
+        $this->redirect('/admin/ai-tokens');
+    }
+
+    public function deletePlatformWhatsAppKey(): void
+    {
+        $this->requirePermission('*');
+
+        (new AiProviderRepository())->forgetPlatformApiKey('whatsapp_cloud');
+        $_SESSION['flash_success'] = 'Token global WhatsApp eliminado.';
         $this->redirect('/admin/ai-tokens');
     }
 
@@ -147,9 +177,19 @@ final class SuperadminController extends Controller
         return (string) preg_replace('/\s+/', '', trim($apiKey, " \t\n\r\0\x0B\"'"));
     }
 
+    private function normalizeMetaToken(string $apiKey): string
+    {
+        return trim($apiKey, " \t\n\r\0\x0B\"'");
+    }
+
     private function isValidOpenAiKey(string $apiKey): bool
     {
         return str_starts_with($apiKey, 'sk-') && strlen($apiKey) >= 30;
+    }
+
+    private function isValidMetaToken(string $apiKey): bool
+    {
+        return strlen($apiKey) >= 40 && !str_contains($apiKey, ' ');
     }
 
     public function deleteOpenAiKey(): void

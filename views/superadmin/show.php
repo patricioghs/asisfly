@@ -114,6 +114,36 @@
 
         <div class="section-heading">
             <div>
+                <span class="eyebrow">Credencial omnicanal</span>
+                <h3>WhatsApp Business Cloud para toda la plataforma</h3>
+                <p class="text-secondary mb-0">Guarda el token de Meta una sola vez. Las empresas solo conectan su numero/cuenta WhatsApp sin ver credenciales tecnicas.</p>
+            </div>
+            <?php if (($whatsappCredential['source'] ?? '') === 'Global'): ?>
+                <span class="status-pill success"><i class="bi bi-whatsapp"></i> Global ****<?= e((string) ($whatsappCredential['last4'] ?? '')) ?></span>
+            <?php else: ?>
+                <span class="status-pill warning"><i class="bi bi-exclamation-triangle"></i> Sin token global</span>
+            <?php endif; ?>
+        </div>
+        <form method="post" action="<?= url('/admin/ai-tokens/platform-whatsapp-key') ?>" class="row g-3 mb-4">
+            <?= csrf_field() ?>
+            <div class="col-md-8">
+                <label class="form-label">Access token Meta / WhatsApp global</label>
+                <input class="form-control" type="password" name="whatsapp_api_key" placeholder="EAAG..." autocomplete="new-password" spellcheck="false" required>
+                <small class="text-secondary">Se cifra con APP_KEY. No se muestra nuevamente despues de guardarlo.</small>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100"><i class="bi bi-shield-lock"></i> Guardar</button>
+            </div>
+        </form>
+        <?php if (($whatsappCredential['source'] ?? '') === 'Global'): ?>
+            <form method="post" action="<?= url('/admin/ai-tokens/platform-whatsapp-key/delete') ?>" class="mb-4">
+                <?= csrf_field() ?>
+                <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Eliminar token WhatsApp</button>
+            </form>
+        <?php endif; ?>
+
+        <div class="section-heading">
+            <div>
                 <span class="eyebrow">Credenciales por empresa</span>
                 <h3>Excepciones por cliente</h3>
                 <p class="text-secondary mb-0">Opcional: usa esto solo si una empresa Enterprise quiere pagar o administrar su propia API key.</p>

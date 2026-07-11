@@ -152,9 +152,11 @@ final class AiProviderRepository
 
     public function platformCredentialStatus(string $provider = 'openai'): array
     {
+        $provider = $this->cleanProvider($provider);
+        $envName = $provider === 'openai' ? 'OPENAI_API_KEY' : '';
         $fallback = [
             'provider' => $provider,
-            'source' => trim((string) env('OPENAI_API_KEY', '')) !== '' ? '.env' : 'Sin clave',
+            'source' => $envName !== '' && trim((string) env($envName, '')) !== '' ? '.env' : 'Sin clave',
             'last4' => null,
             'updated_at' => null,
         ];
@@ -329,7 +331,7 @@ final class AiProviderRepository
     private function cleanProvider(string $provider): string
     {
         $provider = strtolower(trim($provider));
-        return in_array($provider, ['openai', 'anthropic', 'gemini', 'local', 'simulated'], true) ? $provider : 'simulated';
+        return in_array($provider, ['openai', 'anthropic', 'gemini', 'local', 'simulated', 'whatsapp_cloud'], true) ? $provider : 'simulated';
     }
 
     private function fallbackKeySource(string $envName = 'OPENAI_API_KEY'): string

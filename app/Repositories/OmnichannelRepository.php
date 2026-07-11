@@ -175,7 +175,9 @@ final class OmnichannelRepository
             return ['ok' => false, 'message' => 'Cuenta no encontrada.'];
         }
 
-        $credentials = $this->decryptCredentials($account);
+        $credentials = ($account['provider'] ?? '') === 'whatsapp_cloud'
+            ? $this->whatsAppCloudCredentials($account)
+            : $this->decryptCredentials($account);
         if (!$credentials) {
             return ['ok' => false, 'message' => 'Primero guarda las credenciales de esta cuenta.'];
         }
@@ -351,13 +353,17 @@ final class OmnichannelRepository
 
         foreach ($items as $item) {
             $phoneNumberId = (string) ($item['phone_number_id'] ?? '');
-            $account = $this->accountByProviderExternal('whatsapp_cloud', $phoneNumberId);
+            $displayPhoneNumber = (string) ($item['display_phone_number'] ?? '');
+            $account = $this->accountByProviderExternal('whatsapp_cloud', $phoneNumberId)
+                ?: $this->accountByProviderExternal('whatsapp_cloud', $displayPhoneNumber);
             if (!$account) {
                 $skipped++;
-                $lastError = 'No existe una cuenta WhatsApp Cloud activa para Phone Number ID ' . $phoneNumberId . '.';
-                $this->logWebhookWarning('whatsapp_cloud_account_missing', ['phone_number_id' => $phoneNumberId, 'payload' => $item]);
+                $lastError = 'No existe una cuenta WhatsApp Cloud activa para Phone Number ID ' . $phoneNumberId . ' o numero ' . $displayPhoneNumber . '.';
+                $this->logWebhookWarning('whatsapp_cloud_account_missing', ['phone_number_id' => $phoneNumberId, 'display_phone_number' => $displayPhoneNumber, 'payload' => $item]);
                 continue;
             }
+
+            $this->rememberWhatsAppPhoneNumberId($account, $phoneNumberId, $displayPhoneNumber);
 
             $result = $this->receiveWebhook((string) $account['webhook_token'], (array) ($item['payload'] ?? []));
             if (!empty($result['ok'])) {
@@ -455,7 +461,7 @@ final class OmnichannelRepository
 
     private function sendWhatsAppCloudOutbound(array $account, array $conversation, array $payload): array
     {
-        $credentials = $this->decryptCredentials($account);
+        $credentials = $this->whatsAppCloudCredentials($account);
         if (!$credentials || ($credentials['type'] ?? '') !== 'whatsapp_cloud') {
             return ['ok' => false, 'message' => 'No hay credenciales WhatsApp Cloud guardadas para esta cuenta.'];
         }
@@ -507,6 +513,9 @@ final class OmnichannelRepository
     private function withCredentialSummary(array $account): array
     {
         $credentials = $this->decryptCredentials($account);
+        if (($account['provider'] ?? '') === 'whatsapp_cloud') {
+            $credentials = $this->whatsAppCloudCredentials($account);
+        }
         $summary = [
             'is_configured' => !empty($account['credentials_updated_at']),
             'type' => null,
@@ -522,12 +531,17 @@ final class OmnichannelRepository
                     'workspace_id' => (string) ($credentials['workspace_id'] ?? ''),
                 ];
             } elseif (($credentials['type'] ?? '') === 'whatsapp_cloud') {
+                $hasAccessToken = trim((string) ($credentials['access_token'] ?? '')) !== '';
+                $usesPlatformToken = !empty($credentials['uses_platform_token']);
                 $summary += [
                     'phone_number_id' => (string) ($credentials['phone_number_id'] ?? $account['external_account_id'] ?? ''),
                     'business_account_id' => (string) ($credentials['business_account_id'] ?? ''),
                     'graph_version' => (string) ($credentials['graph_version'] ?? 'v20.0'),
                     'webhook_token' => (string) ($account['webhook_token'] ?? ''),
+                    'token_source' => $usesPlatformToken ? 'Global Superadmin' : ($hasAccessToken ? 'Cuenta' : 'Sin token'),
                 ];
+                $summary['is_configured'] = $hasAccessToken && trim((string) ($summary['phone_number_id'] ?? '')) !== '';
+                $summary['label'] = $summary['is_configured'] ? (string) ($summary['phone_number_id'] ?? 'WhatsApp Cloud') : 'Pendiente';
             } else {
                 $summary += [
                     'email_address' => (string) ($credentials['email_address'] ?? $account['external_account_id'] ?? ''),
@@ -603,6 +617,64 @@ final class OmnichannelRepository
         }
 
         return (string) ($credentials['email_address'] ?? $credentials['username'] ?? 'email');
+    }
+
+    private function whatsAppCloudCredentials(array $account): ?array
+    {
+        $credentials = $this->decryptCredentials($account) ?? [];
+        $settings = $this->settings($account);
+        if (($credentials['type'] ?? '') !== 'whatsapp_cloud') {
+            $credentials = [
+                'type' => 'whatsapp_cloud',
+                'phone_number_id' => (string) ($settings['whatsapp_phone_number_id'] ?? $account['external_account_id'] ?? ''),
+                'business_account_id' => '',
+                'graph_version' => 'v20.0',
+                'access_token' => '',
+            ];
+        }
+
+        if (!empty($settings['whatsapp_phone_number_id'])) {
+            $credentials['phone_number_id'] = (string) $settings['whatsapp_phone_number_id'];
+        }
+
+        if (trim((string) ($credentials['phone_number_id'] ?? '')) === '') {
+            $credentials['phone_number_id'] = (string) ($account['external_account_id'] ?? '');
+        }
+
+        if (trim((string) ($credentials['graph_version'] ?? '')) === '') {
+            $credentials['graph_version'] = 'v20.0';
+        }
+
+        if (trim((string) ($credentials['access_token'] ?? '')) === '') {
+            $platformToken = (new AiProviderRepository())->resolvedPlatformApiKey('whatsapp_cloud');
+            if ($platformToken !== '') {
+                $credentials['access_token'] = $platformToken;
+                $credentials['uses_platform_token'] = true;
+            }
+        }
+
+        return is_array($credentials) ? $credentials : null;
+    }
+
+    private function rememberWhatsAppPhoneNumberId(array $account, string $phoneNumberId, string $displayPhoneNumber): void
+    {
+        if ($phoneNumberId === '' || (int) ($account['id'] ?? 0) < 1) {
+            return;
+        }
+
+        $settings = $this->settings($account);
+        $settings['whatsapp_phone_number_id'] = $phoneNumberId;
+        if ($displayPhoneNumber !== '') {
+            $settings['whatsapp_display_phone_number'] = $displayPhoneNumber;
+        }
+
+        Database::connection()->prepare('UPDATE omnichannel_accounts
+            SET settings_json = :settings_json,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id')->execute([
+            'settings_json' => json_encode($settings, JSON_UNESCAPED_UNICODE),
+            'id' => (int) $account['id'],
+        ]);
     }
 
     private function settings(array $account): array
@@ -771,6 +843,7 @@ final class OmnichannelRepository
                 $value = is_array($change['value'] ?? null) ? $change['value'] : [];
                 $metadata = is_array($value['metadata'] ?? null) ? $value['metadata'] : [];
                 $phoneNumberId = trim((string) ($metadata['phone_number_id'] ?? ''));
+                $displayPhoneNumber = preg_replace('/\D+/', '', (string) ($metadata['display_phone_number'] ?? '')) ?: '';
                 $contacts = $this->whatsAppContactsByWaId(is_array($value['contacts'] ?? null) ? $value['contacts'] : []);
                 $messages = is_array($value['messages'] ?? null) ? $value['messages'] : [];
 
@@ -788,6 +861,7 @@ final class OmnichannelRepository
 
                     $items[] = [
                         'phone_number_id' => $phoneNumberId,
+                        'display_phone_number' => $displayPhoneNumber,
                         'payload' => [
                             'body' => $body,
                             'customer_name' => $name,
