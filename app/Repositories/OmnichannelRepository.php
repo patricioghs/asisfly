@@ -14,6 +14,7 @@ use App\Services\OmnichannelAiResponder;
 use App\Services\OmnichannelAutonomyPolicy;
 use App\Services\SecretVault;
 use App\Services\SmtpMailer;
+use App\Services\WhatsAppCloudClient;
 use PDO;
 
 final class OmnichannelRepository
@@ -149,6 +150,22 @@ final class OmnichannelRepository
             'company_id' => $companyId,
             'id' => $accountId,
         ]);
+
+        if (($credentials['type'] ?? '') === 'whatsapp_cloud') {
+            $phoneNumberId = trim((string) ($credentials['phone_number_id'] ?? ''));
+            if ($phoneNumberId !== '') {
+                Database::connection()->prepare('UPDATE omnichannel_accounts
+                    SET external_account_id = :external_account_id,
+                        channel = "WhatsApp",
+                        provider = "whatsapp_cloud",
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE company_id = :company_id AND id = :id')->execute([
+                    'external_account_id' => $phoneNumberId,
+                    'company_id' => $companyId,
+                    'id' => $accountId,
+                ]);
+            }
+        }
     }
 
     public function testCredentials(int $companyId, int $accountId): array
@@ -312,6 +329,53 @@ final class OmnichannelRepository
         ];
     }
 
+    public function verifyWebhookToken(string $token): bool
+    {
+        return $token !== '' && $this->databaseReady() && $this->accountByToken($token) !== null;
+    }
+
+    public function receiveWhatsAppCloud(array $payload): array
+    {
+        if (!$this->databaseReady()) {
+            return ['ok' => false, 'message' => 'Base omnicanal no disponible.'];
+        }
+
+        $items = $this->whatsAppCloudInboundItems($payload);
+        if (empty($items)) {
+            return ['ok' => true, 'message' => 'Webhook WhatsApp recibido sin mensajes nuevos.', 'processed' => 0, 'skipped' => 0];
+        }
+
+        $processed = 0;
+        $skipped = 0;
+        $lastError = null;
+
+        foreach ($items as $item) {
+            $phoneNumberId = (string) ($item['phone_number_id'] ?? '');
+            $account = $this->accountByProviderExternal('whatsapp_cloud', $phoneNumberId);
+            if (!$account) {
+                $skipped++;
+                $lastError = 'No existe una cuenta WhatsApp Cloud activa para Phone Number ID ' . $phoneNumberId . '.';
+                $this->logWebhookWarning('whatsapp_cloud_account_missing', ['phone_number_id' => $phoneNumberId, 'payload' => $item]);
+                continue;
+            }
+
+            $result = $this->receiveWebhook((string) $account['webhook_token'], (array) ($item['payload'] ?? []));
+            if (!empty($result['ok'])) {
+                $processed++;
+            } else {
+                $skipped++;
+                $lastError = (string) ($result['message'] ?? 'No se pudo procesar un mensaje WhatsApp.');
+            }
+        }
+
+        return [
+            'ok' => true,
+            'message' => 'Webhook WhatsApp procesado. Mensajes: ' . $processed . '. Omitidos: ' . $skipped . ($lastError ? '. Ultimo aviso: ' . $lastError : ''),
+            'processed' => $processed,
+            'skipped' => $skipped,
+        ];
+    }
+
     public function markOutboundAttempt(int $companyId, int $conversationId, array $payload): string
     {
         return $this->sendOutboundAttempt($companyId, $conversationId, $payload)['message'];
@@ -341,6 +405,11 @@ final class OmnichannelRepository
             $message .= 'La salida real de esta cuenta no esta habilitada. Activa "Enviar" en Cuentas conectadas.';
         } elseif (($conversation['channel'] ?? '') === 'Email') {
             $send = $this->sendEmailOutbound($account, $conversation, $payload);
+            $ok = $send['ok'];
+            $status = $send['ok'] ? 'sent' : 'failed';
+            $message = $send['message'];
+        } elseif (($account['provider'] ?? '') === 'whatsapp_cloud' && ($conversation['channel'] ?? '') === 'WhatsApp') {
+            $send = $this->sendWhatsAppCloudOutbound($account, $conversation, $payload);
             $ok = $send['ok'];
             $status = $send['ok'] ? 'sent' : 'failed';
             $message = $send['message'];
@@ -382,6 +451,24 @@ final class OmnichannelRepository
         } catch (\Throwable $exception) {
             return ['ok' => false, 'message' => 'No se pudo enviar por SMTP: ' . $exception->getMessage()];
         }
+    }
+
+    private function sendWhatsAppCloudOutbound(array $account, array $conversation, array $payload): array
+    {
+        $credentials = $this->decryptCredentials($account);
+        if (!$credentials || ($credentials['type'] ?? '') !== 'whatsapp_cloud') {
+            return ['ok' => false, 'message' => 'No hay credenciales WhatsApp Cloud guardadas para esta cuenta.'];
+        }
+
+        $to = trim((string) ($conversation['customer_handle'] ?? ''));
+        $body = trim((string) ($payload['body'] ?? ''));
+
+        $result = (new WhatsAppCloudClient())->sendText($credentials, $to, $body);
+        if (!empty($result['ok'])) {
+            return ['ok' => true, 'message' => (string) $result['message']];
+        }
+
+        return ['ok' => false, 'message' => (string) ($result['message'] ?? 'No se pudo enviar WhatsApp Cloud.')];
     }
 
     private function databaseReady(): bool
@@ -434,6 +521,13 @@ final class OmnichannelRepository
                     'api_base_url' => (string) ($credentials['api_base_url'] ?? ''),
                     'workspace_id' => (string) ($credentials['workspace_id'] ?? ''),
                 ];
+            } elseif (($credentials['type'] ?? '') === 'whatsapp_cloud') {
+                $summary += [
+                    'phone_number_id' => (string) ($credentials['phone_number_id'] ?? $account['external_account_id'] ?? ''),
+                    'business_account_id' => (string) ($credentials['business_account_id'] ?? ''),
+                    'graph_version' => (string) ($credentials['graph_version'] ?? 'v20.0'),
+                    'webhook_token' => (string) ($account['webhook_token'] ?? ''),
+                ];
             } else {
                 $summary += [
                     'email_address' => (string) ($credentials['email_address'] ?? $account['external_account_id'] ?? ''),
@@ -468,6 +562,18 @@ final class OmnichannelRepository
             ];
         }
 
+        if (($account['provider'] ?? '') === 'whatsapp_cloud') {
+            $accessToken = trim((string) ($input['access_token'] ?? ''));
+            $phoneNumberId = trim((string) ($input['phone_number_id'] ?? $account['external_account_id'] ?? ''));
+            return [
+                'type' => 'whatsapp_cloud',
+                'access_token' => $accessToken !== '' ? $accessToken : (string) ($existing['access_token'] ?? ''),
+                'phone_number_id' => $phoneNumberId,
+                'business_account_id' => trim((string) ($input['business_account_id'] ?? $existing['business_account_id'] ?? '')),
+                'graph_version' => $this->graphVersion((string) ($input['graph_version'] ?? $existing['graph_version'] ?? 'v20.0')),
+            ];
+        }
+
         $password = (string) ($input['password'] ?? '');
         return [
             'type' => 'email_imap_smtp',
@@ -490,6 +596,12 @@ final class OmnichannelRepository
             return $token !== '' ? 'token ****' . substr($token, -4) : 'api';
         }
 
+        if (($credentials['type'] ?? '') === 'whatsapp_cloud') {
+            $token = (string) ($credentials['access_token'] ?? '');
+            $phoneNumberId = (string) ($credentials['phone_number_id'] ?? 'whatsapp');
+            return $token !== '' ? $phoneNumberId . ' / token ****' . substr($token, -4) : $phoneNumberId;
+        }
+
         return (string) ($credentials['email_address'] ?? $credentials['username'] ?? 'email');
     }
 
@@ -503,6 +615,18 @@ final class OmnichannelRepository
     {
         $statement = Database::connection()->prepare('SELECT * FROM omnichannel_accounts WHERE webhook_token = :token AND status != "disabled" LIMIT 1');
         $statement->execute(['token' => $token]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    private function accountByProviderExternal(string $provider, string $externalAccountId): ?array
+    {
+        if ($externalAccountId === '') {
+            return null;
+        }
+
+        $statement = Database::connection()->prepare('SELECT * FROM omnichannel_accounts WHERE provider = :provider AND external_account_id = :external_account_id AND status != "disabled" ORDER BY FIELD(status, "connected", "sandbox", "simulated", "error") LIMIT 1');
+        $statement->execute(['provider' => $provider, 'external_account_id' => $externalAccountId]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }
@@ -634,6 +758,110 @@ final class OmnichannelRepository
             'subject' => trim((string) $subject) ?: 'Nueva conversacion ' . $channel,
             'priority' => $this->priority((string) $body),
         ];
+    }
+
+    private function whatsAppCloudInboundItems(array $payload): array
+    {
+        $items = [];
+        $entries = is_array($payload['entry'] ?? null) ? $payload['entry'] : [];
+
+        foreach ($entries as $entry) {
+            $changes = is_array($entry['changes'] ?? null) ? $entry['changes'] : [];
+            foreach ($changes as $change) {
+                $value = is_array($change['value'] ?? null) ? $change['value'] : [];
+                $metadata = is_array($value['metadata'] ?? null) ? $value['metadata'] : [];
+                $phoneNumberId = trim((string) ($metadata['phone_number_id'] ?? ''));
+                $contacts = $this->whatsAppContactsByWaId(is_array($value['contacts'] ?? null) ? $value['contacts'] : []);
+                $messages = is_array($value['messages'] ?? null) ? $value['messages'] : [];
+
+                foreach ($messages as $message) {
+                    if (!is_array($message)) {
+                        continue;
+                    }
+
+                    $from = preg_replace('/\D+/', '', (string) ($message['from'] ?? '')) ?: '';
+                    $contact = $contacts[$from] ?? [];
+                    $name = trim((string) ($contact['name'] ?? '')) ?: ($from !== '' ? '+' . $from : 'Cliente WhatsApp');
+                    $body = $this->whatsAppMessageBody($message);
+                    $messageId = trim((string) ($message['id'] ?? ''));
+                    $threadId = 'wa-' . $phoneNumberId . '-' . ($from ?: sha1($messageId ?: json_encode($message)));
+
+                    $items[] = [
+                        'phone_number_id' => $phoneNumberId,
+                        'payload' => [
+                            'body' => $body,
+                            'customer_name' => $name,
+                            'customer_handle' => $from,
+                            'phone' => $from,
+                            'subject' => 'WhatsApp de ' . $name,
+                            'conversation_id' => $threadId,
+                            'message_id' => $messageId,
+                            'whatsapp_type' => (string) ($message['type'] ?? 'unknown'),
+                            'raw_whatsapp' => $message,
+                        ],
+                    ];
+                }
+            }
+        }
+
+        return $items;
+    }
+
+    private function whatsAppContactsByWaId(array $contacts): array
+    {
+        $indexed = [];
+        foreach ($contacts as $contact) {
+            if (!is_array($contact)) {
+                continue;
+            }
+
+            $waId = preg_replace('/\D+/', '', (string) ($contact['wa_id'] ?? '')) ?: '';
+            if ($waId === '') {
+                continue;
+            }
+
+            $profile = is_array($contact['profile'] ?? null) ? $contact['profile'] : [];
+            $indexed[$waId] = ['name' => (string) ($profile['name'] ?? '')];
+        }
+
+        return $indexed;
+    }
+
+    private function whatsAppMessageBody(array $message): string
+    {
+        $type = (string) ($message['type'] ?? 'text');
+        if ($type === 'text') {
+            return trim((string) ($message['text']['body'] ?? ''));
+        }
+
+        if ($type === 'interactive') {
+            $interactive = is_array($message['interactive'] ?? null) ? $message['interactive'] : [];
+            $button = is_array($interactive['button_reply'] ?? null) ? $interactive['button_reply'] : [];
+            $list = is_array($interactive['list_reply'] ?? null) ? $interactive['list_reply'] : [];
+            return trim((string) ($button['title'] ?? $list['title'] ?? '[Respuesta interactiva recibida]'));
+        }
+
+        if ($type === 'button') {
+            return trim((string) ($message['button']['text'] ?? '[Boton recibido]'));
+        }
+
+        foreach (['image' => 'Imagen', 'video' => 'Video', 'document' => 'Documento', 'audio' => 'Audio', 'sticker' => 'Sticker'] as $mediaType => $label) {
+            if ($type === $mediaType) {
+                $media = is_array($message[$mediaType] ?? null) ? $message[$mediaType] : [];
+                $caption = trim((string) ($media['caption'] ?? $media['filename'] ?? ''));
+                return '[' . $label . ' recibido]' . ($caption !== '' ? ' ' . $caption : '');
+            }
+        }
+
+        if ($type === 'location') {
+            return '[Ubicacion recibida]';
+        }
+
+        if ($type === 'contacts') {
+            return '[Contacto recibido]';
+        }
+
+        return '[Mensaje WhatsApp recibido: ' . $type . ']';
     }
 
     private function upsertConversation(int $companyId, array $account, array $message): int
@@ -1049,5 +1277,25 @@ final class OmnichannelRepository
     private function encryption(string $value): string
     {
         return in_array($value, ['ssl', 'tls', 'none'], true) ? $value : 'tls';
+    }
+
+    private function graphVersion(string $version): string
+    {
+        $version = trim($version);
+        return preg_match('/^v\d+\.\d+$/', $version) ? $version : 'v20.0';
+    }
+
+    private function logWebhookWarning(string $event, array $payload): void
+    {
+        $directory = dirname(__DIR__, 2) . '/logs';
+        if (!is_dir($directory)) {
+            @mkdir($directory, 0775, true);
+        }
+
+        @file_put_contents($directory . '/whatsapp-cloud.log', json_encode([
+            'at' => date('c'),
+            'event' => $event,
+            'payload' => $payload,
+        ], JSON_UNESCAPED_UNICODE) . PHP_EOL, FILE_APPEND);
     }
 }

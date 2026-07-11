@@ -165,3 +165,5 @@ $router->post('/admin/ai-tokens/openai-key/delete', [SuperadminController::class
 $router->get('/admin/audit-logs', [SuperadminController::class, 'auditLogs']);
 $router->get('/admin/system-status', [SuperadminController::class, 'systemStatus']);
 $router->post('/webhooks/omnichannel', [WebhookController::class, 'omnichannel']);
+$router->get('/webhooks/whatsapp-cloud', [WebhookController::class, 'whatsappCloudVerify']);
+$router->post('/webhooks/whatsapp-cloud', [WebhookController::class, 'whatsappCloudReceive']);

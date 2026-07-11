@@ -4,6 +4,9 @@ $channelLabels = ['WhatsApp' => 'WhatsApp', 'Email' => 'Email', 'Instagram' => '
 $statusLabels = ['simulated' => 'Demo', 'sandbox' => 'Prueba', 'connected' => 'Conectada', 'disabled' => 'Pausada', 'error' => 'Error'];
 $brainLabels = ['commercial' => 'Ventas y clientes', 'administrative' => 'Administracion', 'analytical' => 'Analisis y reportes', 'operational' => 'Operaciones', 'executive' => 'Direccion'];
 $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Instagram' => 'bi-instagram', 'Messenger' => 'bi-messenger', 'Telegram' => 'bi-telegram', 'Operaciones' => 'bi-kanban'];
+$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$webhookHost = (string) ($_SERVER['HTTP_HOST'] ?? '');
+$whatsAppWebhookUrl = $webhookHost !== '' ? $scheme . '://' . $webhookHost . url('/webhooks/whatsapp-cloud') : url('/webhooks/whatsapp-cloud');
 ?>
 
 <section class="panel launch-hero">
@@ -91,6 +94,7 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
                 $credential = $account['credential_summary'] ?? [];
                 $hasCredentials = !empty($credential['is_configured']);
                 $isEmailProvider = in_array($account['provider'], ['imap', 'gmail', 'outlook'], true);
+                $isWhatsAppProvider = $account['provider'] === 'whatsapp_cloud';
             ?>
             <article class="panel account-card">
                 <div class="account-card-head">
@@ -121,6 +125,12 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
                             <div><dt>IMAP</dt><dd><?= e((string) ($credential['imap_host'] ?? 'No registrado')) ?><?= !empty($credential['imap_port']) ? ':' . e((string) $credential['imap_port']) : '' ?></dd></div>
                             <div><dt>SMTP</dt><dd><?= e((string) ($credential['smtp_host'] ?? 'No registrado')) ?><?= !empty($credential['smtp_port']) ? ':' . e((string) $credential['smtp_port']) : '' ?></dd></div>
                             <div><dt>Usuario</dt><dd><?= e((string) ($credential['username'] ?? $credential['email_address'] ?? 'No registrado')) ?></dd></div>
+                        </dl>
+                    <?php elseif ($isWhatsAppProvider): ?>
+                        <dl>
+                            <div><dt>Phone Number ID</dt><dd><?= e((string) ($credential['phone_number_id'] ?? $account['external_account_id'] ?? 'No registrado')) ?></dd></div>
+                            <div><dt>Business ID</dt><dd><?= e((string) ($credential['business_account_id'] ?? 'Opcional')) ?></dd></div>
+                            <div><dt>Graph API</dt><dd><?= e((string) ($credential['graph_version'] ?? 'v20.0')) ?></dd></div>
                         </dl>
                     <?php elseif ($account['provider'] === 'obraok'): ?>
                         <dl>
@@ -243,6 +253,47 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
                                 </label>
                             </div>
                             <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar credenciales correo</button>
+                        </form>
+                    </details>
+                <?php elseif ($isWhatsAppProvider): ?>
+                    <details class="account-details">
+                        <summary><span><?= $hasCredentials ? 'Actualizar WhatsApp Cloud API' : 'Configurar WhatsApp Cloud API' ?></span><i class="bi bi-chevron-down"></i></summary>
+                        <div class="account-token">
+                            <span>Webhook Meta</span>
+                            <code><?= e($whatsAppWebhookUrl) ?></code>
+                        </div>
+                        <div class="account-token">
+                            <span>Verify token</span>
+                            <code><?= e((string) ($account['webhook_token'] ?? '')) ?></code>
+                        </div>
+                        <form class="account-card-form" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
+                            <div class="account-form-row">
+                                <label>
+                                    <span>Phone Number ID</span>
+                                    <input class="form-control" name="phone_number_id" value="<?= e((string) ($credential['phone_number_id'] ?? $account['external_account_id'] ?? '')) ?>" placeholder="ID del numero en Meta" required>
+                                </label>
+                                <label>
+                                    <span>Business Account ID</span>
+                                    <input class="form-control" name="business_account_id" value="<?= e((string) ($credential['business_account_id'] ?? '')) ?>" placeholder="Opcional">
+                                </label>
+                            </div>
+                            <div class="account-form-row">
+                                <label>
+                                    <span>Graph API</span>
+                                    <select class="form-select" name="graph_version">
+                                        <?php foreach (['v20.0', 'v21.0', 'v22.0'] as $version): ?>
+                                            <option value="<?= e($version) ?>" <?= (string) ($credential['graph_version'] ?? 'v20.0') === $version ? 'selected' : '' ?>><?= e($version) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </label>
+                                <label>
+                                    <span>Access token</span>
+                                    <input class="form-control" type="password" name="access_token" placeholder="<?= $hasCredentials ? 'Dejar vacio mantiene el token actual' : 'Token permanente de Meta' ?>" autocomplete="new-password">
+                                </label>
+                            </div>
+                            <button class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock"></i> Guardar WhatsApp Cloud</button>
                         </form>
                     </details>
                 <?php elseif ($account['provider'] === 'obraok'): ?>
