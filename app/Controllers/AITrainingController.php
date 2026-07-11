@@ -26,13 +26,23 @@ final class AITrainingController extends Controller
 
         $this->view('ai_training/index', [
             'title' => 'Centro de Entrenamiento IA',
-            'section' => trim((string) ($_GET['section'] ?? 'summary')),
+            'section' => $this->sectionFromRequest(),
             'overview' => $overview,
             'questions' => $questions,
             'answersByKey' => $answersByKey,
             'simulation' => $_SESSION['ai_training_simulation'] ?? null,
         ]);
         unset($_SESSION['ai_training_simulation']);
+    }
+
+    private function sectionFromRequest(): string
+    {
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+        if (preg_match('#/ai-training/([a-z-]+)$#', $path, $matches)) {
+            return trim((string) $matches[1]);
+        }
+
+        return trim((string) ($_GET['section'] ?? 'summary'));
     }
 
     public function saveOnboarding(): void

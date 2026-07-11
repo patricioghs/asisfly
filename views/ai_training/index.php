@@ -39,6 +39,7 @@ if (!isset($tabs[$section])) {
     $section = 'summary';
 }
 $activeTab = $tabs[$section];
+$trainingSectionUrl = static fn (string $key): string => url('/ai-training/' . $key) . '#training-content';
 $statusLabels = ['draft' => 'Borrador', 'review' => 'En revision', 'published' => 'Publicado', 'archived' => 'Archivado'];
 $toneLabels = ['formal' => 'Formal', 'professional' => 'Profesional', 'close' => 'Cercano', 'technical' => 'Tecnico', 'commercial' => 'Comercial'];
 $lengthLabels = ['short' => 'Breve', 'medium' => 'Media', 'detailed' => 'Detallada'];
@@ -53,8 +54,8 @@ $progress = (int) ($session['progress_percent'] ?? 0);
         <h2>Ensena a AsisFly como trabaja tu empresa</h2>
         <p>Construye el perfil, reglas, preguntas frecuentes y ejemplos que el trabajador virtual usara como contexto autorizado antes de responder.</p>
         <div class="controls-hero-actions">
-            <a class="btn btn-primary" href="<?= url('/ai-training?section=onboarding') ?>#training-content"><i class="bi bi-chat-dots"></i> Continuar entrevista</a>
-            <a class="btn btn-outline-secondary" href="<?= url('/ai-training?section=simulator') ?>#training-content"><i class="bi bi-stars"></i> Practicar respuesta</a>
+            <a class="btn btn-primary" href="<?= e($trainingSectionUrl('onboarding')) ?>"><i class="bi bi-chat-dots"></i> Continuar entrevista</a>
+            <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('simulator')) ?>"><i class="bi bi-stars"></i> Practicar respuesta</a>
         </div>
     </div>
     <div class="controls-command-card">
@@ -66,7 +67,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
 
 <nav class="panel controls-filter-bar ai-training-tabs mt-4" aria-label="Secciones del Centro de Entrenamiento IA">
     <?php foreach ($tabs as $key => [$label, $icon]): ?>
-        <a class="btn <?= $section === $key ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= url('/ai-training?section=' . $key) ?>#training-content"><i class="bi <?= e($icon) ?>"></i><?= e($label) ?></a>
+        <a class="btn <?= $section === $key ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= e($trainingSectionUrl($key)) ?>"><i class="bi <?= e($icon) ?>"></i><?= e($label) ?></a>
     <?php endforeach; ?>
 </nav>
 
