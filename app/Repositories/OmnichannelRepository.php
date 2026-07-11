@@ -1286,6 +1286,7 @@ final class OmnichannelRepository
             'knowledge_hits' => $aiDraft['knowledge_hits'] ?? 0,
             'context_log_id' => $aiDraft['context_log_id'] ?? null,
             'generated_response_id' => $aiDraft['generated_response_id'] ?? null,
+            'brand_route' => $aiDraft['brand_route'] ?? null,
             'confidence' => $aiDraft['confidence'] ?? null,
             'error' => $aiDraft['error'] ?? null,
         ];

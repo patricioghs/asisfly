@@ -15,12 +15,21 @@ $aiStateOptions = [
     'human_answered' => 'Respondida por humano',
     'closed' => 'Cerrada',
 ];
+$routingStatusOptions = [
+    'manual' => 'Confirmadas por humano',
+    'confirmed' => 'Confirmada',
+    'corrected' => 'Corregida',
+    'suggested' => 'Sugeridas por IA',
+    'uncertain' => 'Dudosas',
+    'unrouted' => 'Sin marca',
+];
 $latestDraft = $selected['latest_draft'] ?? null;
 $supervisionReport = $supervisionReport ?? ['decisionCounts' => [], 'generatedCounts' => [], 'channels' => [], 'recentContexts' => []];
 $decisionCounts = $supervisionReport['decisionCounts'] ?? [];
 $generatedCounts = $supervisionReport['generatedCounts'] ?? [];
 $channelSettings = $supervisionReport['channels'] ?? [];
 $recentContexts = $supervisionReport['recentContexts'] ?? [];
+$routingSummary = $supervisionReport['routingSummary'] ?? [];
 $brandRoutes = $brandRoutes ?? [];
 $filterQuery = http_build_query(array_filter($filters ?? [], fn ($value) => $value !== ''));
 $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(array_filter([...($filters ?? []), ...$extra], fn ($value) => $value !== '')));
@@ -67,6 +76,16 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
             <strong><?= e((string) array_sum(array_map('intval', $generatedCounts))) ?></strong>
             <small><?= e((string) ($generatedCounts['sent'] ?? 0)) ?> enviadas, <?= e((string) ($generatedCounts['edited'] ?? 0)) ?> editadas.</small>
         </article>
+        <article>
+            <span>Con marca</span>
+            <strong><?= e((string) ($routingSummary['routed'] ?? 0)) ?></strong>
+            <small><?= e((string) ($routingSummary['manual'] ?? 0)) ?> confirmadas por humano.</small>
+        </article>
+        <article>
+            <span>Sin marca</span>
+            <strong><?= e((string) ($routingSummary['unrouted'] ?? 0)) ?></strong>
+            <small><?= e((string) ($routingSummary['uncertain'] ?? 0)) ?> conversaciones dudosas.</small>
+        </article>
     </div>
     <div class="supervision-policy-list">
         <?php foreach (array_slice($channelSettings, 0, 5) as $setting): ?>
@@ -99,6 +118,14 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                     <option value="<?= e((string) $account['id']) ?>" <?= (string) ($filters['account_id'] ?? '') === (string) $account['id'] ? 'selected' : '' ?>><?= e($account['display_name']) ?></option>
                 <?php endforeach; ?>
             </select>
+            <select class="form-select" name="brand_route_id" aria-label="Marca o negocio">
+                <option value="">Marca/negocio: todos</option>
+                <?php foreach ($brandRoutes as $route): ?>
+                    <option value="<?= e((string) $route['id']) ?>" <?= (string) ($filters['brand_route_id'] ?? '') === (string) $route['id'] ? 'selected' : '' ?>>
+                        <?= e($route['brand_name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
             <select class="form-select" name="status">
                 <option value="">Todos los estados</option>
                 <?php foreach ($statusOptions as $value => $label): ?>
@@ -117,6 +144,12 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                     <option value="<?= e($value) ?>" <?= ($filters['ai_state'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
                 <?php endforeach; ?>
             </select>
+            <select class="form-select" name="routing_status">
+                <option value="">Enrutamiento: todos</option>
+                <?php foreach ($routingStatusOptions as $value => $label): ?>
+                    <option value="<?= e($value) ?>" <?= ($filters['routing_status'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
             <label class="supervision-intervention-toggle">
                 <input type="checkbox" name="intervention" value="1" <?= !empty($filters['intervention']) ? 'checked' : '' ?>>
                 <span>Solo intervencion</span>
@@ -130,6 +163,8 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
             <a class="<?= ($filters['ai_state'] ?? '') === 'approval_required' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'approval_required', 'intervention' => ''])) ?>"><i class="bi bi-shield-check"></i> Por aprobar</a>
             <a class="<?= ($filters['ai_state'] ?? '') === 'human_required' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'human_required', 'intervention' => ''])) ?>"><i class="bi bi-person-raised-hand"></i> Requieren humano</a>
             <a class="<?= ($filters['ai_state'] ?? '') === 'ai_resolved' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'ai_resolved', 'intervention' => ''])) ?>"><i class="bi bi-check2-circle"></i> Resueltas por IA</a>
+            <a class="<?= ($filters['routing_status'] ?? '') === 'unrouted' ? 'active' : '' ?>" href="<?= e($quickFilter(['routing_status' => 'unrouted', 'brand_route_id' => ''])) ?>"><i class="bi bi-signpost"></i> Sin marca</a>
+            <a class="<?= ($filters['routing_status'] ?? '') === 'manual' ? 'active' : '' ?>" href="<?= e($quickFilter(['routing_status' => 'manual', 'brand_route_id' => ''])) ?>"><i class="bi bi-patch-check"></i> Confirmadas</a>
         </div>
 
         <div class="supervision-section-label">Prioridad humana</div>
@@ -145,7 +180,7 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                     <span class="priority priority-<?= e($conversation['priority']) ?>"><i class="bi <?= e($priorityIcons[$conversation['priority']] ?? 'bi-dot') ?>"></i><?= e($priorityOptions[$conversation['priority']] ?? $conversation['priority']) ?></span>
                     <span class="assignee-chip"><i class="bi bi-diagram-3"></i><?= e($brainLabels[$conversation['account_brain'] ?? ''] ?? 'General') ?></span>
                     <?php if (!empty($conversation['brand_detection']['brand_name'])): ?>
-                        <span class="assignee-chip"><i class="bi bi-signpost-split"></i><?= e($conversation['brand_detection']['brand_name']) ?> · <?= e((string) $conversation['brand_detection']['confidence']) ?>%</span>
+                        <span class="assignee-chip"><i class="bi bi-signpost-split"></i><?= e($conversation['brand_detection']['brand_name']) ?> - <?= e((string) $conversation['brand_detection']['confidence']) ?>%</span>
                     <?php endif; ?>
                     <?= !empty($conversation['assigned_name']) ? '<span class="assignee-chip"><i class="bi bi-person"></i>' . e($conversation['assigned_name']) . '</span>' : '' ?>
                 </small>
@@ -180,8 +215,9 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                     <small><?= e($selected['ai_reason'] ?? '') ?></small>
                     <?php if (!empty($selected['brand_detection']['brand_name'])): ?>
                         <div class="supervision-decision-tags">
-                            <span><i class="bi bi-signpost-split"></i> Marca sugerida: <?= e($selected['brand_detection']['brand_name']) ?></span>
+                            <span><i class="bi bi-signpost-split"></i> <?= in_array(($selected['brand_detection']['status'] ?? ''), ['confirmed', 'corrected'], true) ? 'Marca confirmada' : 'Marca sugerida' ?>: <?= e($selected['brand_detection']['brand_name']) ?></span>
                             <span><i class="bi bi-speedometer2"></i> <?= e((string) $selected['brand_detection']['confidence']) ?>% confianza</span>
+                            <span><i class="bi bi-patch-check"></i><?= e($routingStatusOptions[$selected['brand_detection']['status'] ?? ''] ?? ($selected['brand_detection']['status'] ?? 'Detectada')) ?></span>
                             <?php if (!empty($selected['brand_detection']['target_company_name'])): ?>
                                 <span><i class="bi bi-building"></i> <?= e($selected['brand_detection']['target_company_name']) ?></span>
                             <?php endif; ?>
@@ -236,6 +272,9 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                                 <small>Riesgo <?= e($event['risk'] ?? 'medium') ?> - <?= e((string) ($event['confidence'] ?? 0)) ?>% confianza - <?= e($event['created_at'] ?? '') ?></small>
                                 <?php if (!empty($event['draft_status'])): ?>
                                     <small>Respuesta: <?= e($event['draft_status']) ?> / <?= e($event['draft_provider'] ?: 'simulated') ?> <?= e($event['draft_model'] ?? '') ?> - memoria <?= e((string) ($event['memory_hits'] ?? 0)) ?> - conocimiento <?= e((string) ($event['knowledge_hits'] ?? 0)) ?></small>
+                                <?php endif; ?>
+                                <?php if (!empty($event['brand_route']['brand_name'])): ?>
+                                    <small>Marca usada: <?= e($event['brand_route']['brand_name']) ?><?= !empty($event['brand_route']['target_company_name']) ? ' / ' . e($event['brand_route']['target_company_name']) : '' ?> - <?= e((string) ($event['brand_route']['confidence'] ?? 0)) ?>%</small>
                                 <?php endif; ?>
                                 <?php if (!empty($event['channel_mode'])): ?>
                                     <small>Politica: canal <?= e($event['channel_mode']) ?><?= !empty($event['min_confidence']) ? ' / minimo ' . e((string) $event['min_confidence']) . '%' : '' ?><?= !empty($event['context_log_id']) ? ' / contexto #' . e((string) $event['context_log_id']) : '' ?></small>

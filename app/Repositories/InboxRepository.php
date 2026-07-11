@@ -153,6 +153,7 @@ final class InboxRepository
                 'generatedCounts' => [],
                 'channels' => [],
                 'recentContexts' => [],
+                'routingSummary' => [],
             ];
         }
 
@@ -161,6 +162,7 @@ final class InboxRepository
             'generatedCounts' => $this->generatedResponseCounts($companyId),
             'channels' => $this->channelAutonomySettings($companyId),
             'recentContexts' => $this->recentContextLogs($companyId),
+            'routingSummary' => $this->brandRoutingSummary($companyId),
         ];
     }
 
@@ -552,6 +554,27 @@ final class InboxRepository
             $conversations = array_values(array_filter($conversations, fn (array $conversation): bool => !empty($conversation['requires_human'])));
         }
 
+        $brandRouteId = (int) ($filters['brand_route_id'] ?? 0);
+        if ($brandRouteId > 0) {
+            $conversations = array_values(array_filter($conversations, fn (array $conversation): bool => (int) ($conversation['brand_detection']['route_id'] ?? 0) === $brandRouteId));
+        }
+
+        $routingStatus = (string) ($filters['routing_status'] ?? '');
+        if ($routingStatus !== '') {
+            $conversations = array_values(array_filter($conversations, function (array $conversation) use ($routingStatus): bool {
+                $status = (string) ($conversation['brand_detection']['status'] ?? '');
+                if ($routingStatus === 'unrouted') {
+                    return $status === '';
+                }
+
+                if ($routingStatus === 'manual') {
+                    return in_array($status, ['confirmed', 'corrected'], true);
+                }
+
+                return $status === $routingStatus;
+            }));
+        }
+
         return $conversations;
     }
 
@@ -617,6 +640,7 @@ final class InboxRepository
                     'knowledge_hits' => (int) ($payload['ai_draft']['knowledge_hits'] ?? 0),
                     'context_log_id' => (int) ($payload['ai_draft']['context_log_id'] ?? 0),
                     'generated_response_id' => (int) ($payload['ai_draft']['generated_response_id'] ?? 0),
+                    'brand_route' => is_array($payload['ai_draft']['brand_route'] ?? null) ? $payload['ai_draft']['brand_route'] : [],
                     'channel_mode' => (string) ($decision['channel_mode'] ?? ''),
                     'min_confidence' => (int) ($decision['min_confidence'] ?? 0),
                     'commercial_ok' => (bool) ($payload['commercial_automation']['ok'] ?? false),
@@ -663,6 +687,45 @@ final class InboxRepository
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    private function brandRoutingSummary(int $companyId): array
+    {
+        $conversations = $this->conversations($companyId);
+        $summary = [
+            'total' => count($conversations),
+            'routed' => 0,
+            'manual' => 0,
+            'suggested' => 0,
+            'uncertain' => 0,
+            'unrouted' => 0,
+            'by_brand' => [],
+        ];
+
+        foreach ($conversations as $conversation) {
+            $detection = $conversation['brand_detection'] ?? null;
+            $status = is_array($detection) ? (string) ($detection['status'] ?? '') : '';
+            $brand = is_array($detection) ? (string) ($detection['brand_name'] ?? '') : '';
+
+            if ($brand === '') {
+                $summary['unrouted']++;
+                continue;
+            }
+
+            $summary['routed']++;
+            $summary['by_brand'][$brand] = ($summary['by_brand'][$brand] ?? 0) + 1;
+
+            if (in_array($status, ['confirmed', 'corrected'], true)) {
+                $summary['manual']++;
+            } elseif ($status === 'suggested') {
+                $summary['suggested']++;
+            } elseif ($status === 'uncertain') {
+                $summary['uncertain']++;
+            }
+        }
+
+        arsort($summary['by_brand']);
+        return $summary;
     }
 
     private function channelAutonomySettings(int $companyId): array

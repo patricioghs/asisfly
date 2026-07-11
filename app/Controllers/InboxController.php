@@ -21,6 +21,8 @@ final class InboxController extends Controller
             'status' => trim((string) ($_GET['status'] ?? '')),
             'priority' => trim((string) ($_GET['priority'] ?? '')),
             'ai_state' => trim((string) ($_GET['ai_state'] ?? '')),
+            'brand_route_id' => trim((string) ($_GET['brand_route_id'] ?? '')),
+            'routing_status' => trim((string) ($_GET['routing_status'] ?? '')),
             'intervention' => trim((string) ($_GET['intervention'] ?? '')),
         ];
 
