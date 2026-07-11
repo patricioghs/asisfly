@@ -1,5 +1,19 @@
 <?php
-$section = trim((string) ($section ?? 'summary'));
+$section = trim((string) ($_GET['section'] ?? ($section ?? 'summary')));
+$requestValue = (string) ($_SERVER['REQUEST_URI'] ?? '');
+if (($section === '' || $section === 'summary') && preg_match('~(?:^|/)ai-training/([a-z-]+)(?:[?#/].*)?$~', $requestValue, $requestMatches)) {
+    $section = trim((string) $requestMatches[1]);
+}
+if (($section === '' || $section === 'summary')) {
+    $queryString = (string) parse_url($requestValue, PHP_URL_QUERY);
+    parse_str($queryString, $queryParams);
+    if (!empty($queryParams['section'])) {
+        $section = trim((string) $queryParams['section']);
+    }
+}
+if (($section === '' || $section === 'summary') && !empty($_GET['section'])) {
+    $section = trim((string) $_GET['section']);
+}
 $overview = $overview ?? [];
 $session = $overview['session'] ?? [];
 $profile = $overview['profile'] ?? [];
@@ -39,7 +53,7 @@ if (!isset($tabs[$section])) {
     $section = 'summary';
 }
 $activeTab = $tabs[$section];
-$trainingSectionUrl = static fn (string $key): string => url('/ai-training/' . $key) . '#training-content';
+$trainingSectionUrl = static fn (string $key): string => url('/ai-training?section=' . $key) . '#training-content';
 $statusLabels = ['draft' => 'Borrador', 'review' => 'En revision', 'published' => 'Publicado', 'archived' => 'Archivado'];
 $toneLabels = ['formal' => 'Formal', 'professional' => 'Profesional', 'close' => 'Cercano', 'technical' => 'Tecnico', 'commercial' => 'Comercial'];
 $lengthLabels = ['short' => 'Breve', 'medium' => 'Media', 'detailed' => 'Detallada'];
@@ -80,6 +94,21 @@ $progress = (int) ($session['progress_percent'] ?? 0);
 </section>
 
 <?php if ($section === 'summary'): ?>
+    <section class="panel ai-training-next-steps mt-4">
+        <div>
+            <span class="eyebrow">Como entrenar a AsisFly</span>
+            <h2>El resumen solo muestra avance. Para escribir datos, entra a una seccion de entrenamiento.</h2>
+        </div>
+        <div class="ai-training-step-actions">
+            <a class="btn btn-primary" href="<?= e($trainingSectionUrl('onboarding')) ?>"><i class="bi bi-chat-dots"></i> Entrevista inicial</a>
+            <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('company')) ?>"><i class="bi bi-building"></i> Empresa</a>
+            <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('products')) ?>"><i class="bi bi-box-seam"></i> Productos</a>
+            <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('rules')) ?>"><i class="bi bi-shield-check"></i> Reglas</a>
+            <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('faqs')) ?>"><i class="bi bi-question-circle"></i> FAQs</a>
+            <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('documents')) ?>"><i class="bi bi-file-earmark-text"></i> Documentos</a>
+        </div>
+    </section>
+
     <section class="workbench-metrics mt-4">
         <?php foreach ($metrics as $metric): ?>
             <article class="metric-card">

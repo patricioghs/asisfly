@@ -1305,6 +1305,25 @@ a {
   max-width: 420px;
 }
 
+.ai-training-next-steps {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+}
+
+.ai-training-next-steps h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.ai-training-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .controls-shell {
   align-items: start;
   display: grid;

@@ -15,6 +15,76 @@ final class AITrainingController extends Controller
 {
     public function index(): void
     {
+        $this->show($this->sectionFromRequest());
+    }
+
+    public function summary(): void
+    {
+        $this->show('summary');
+    }
+
+    public function onboarding(): void
+    {
+        $this->show('onboarding');
+    }
+
+    public function company(): void
+    {
+        $this->show('company');
+    }
+
+    public function products(): void
+    {
+        $this->show('products');
+    }
+
+    public function personality(): void
+    {
+        $this->show('personality');
+    }
+
+    public function rules(): void
+    {
+        $this->show('rules');
+    }
+
+    public function faqs(): void
+    {
+        $this->show('faqs');
+    }
+
+    public function documents(): void
+    {
+        $this->show('documents');
+    }
+
+    public function examples(): void
+    {
+        $this->show('examples');
+    }
+
+    public function corrections(): void
+    {
+        $this->show('corrections');
+    }
+
+    public function simulator(): void
+    {
+        $this->show('simulator');
+    }
+
+    public function settings(): void
+    {
+        $this->show('settings');
+    }
+
+    public function versions(): void
+    {
+        $this->show('versions');
+    }
+
+    private function show(string $section): void
+    {
         $this->requireTrainingAccess('ai_training.view');
         $repo = new AITrainingRepository();
         $overview = $repo->overview($this->companyId());
@@ -26,7 +96,7 @@ final class AITrainingController extends Controller
 
         $this->view('ai_training/index', [
             'title' => 'Centro de Entrenamiento IA',
-            'section' => $this->sectionFromRequest(),
+            'section' => $section,
             'overview' => $overview,
             'questions' => $questions,
             'answersByKey' => $answersByKey,
@@ -37,9 +107,15 @@ final class AITrainingController extends Controller
 
     private function sectionFromRequest(): string
     {
-        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
-        if (preg_match('#/ai-training/([a-z-]+)$#', $path, $matches)) {
-            return trim((string) $matches[1]);
+        foreach (['REQUEST_URI', 'PATH_INFO', 'ORIG_PATH_INFO', 'REDIRECT_URL'] as $key) {
+            $value = (string) ($_SERVER[$key] ?? '');
+            $path = parse_url($value, PHP_URL_PATH) ?: $value;
+            if (preg_match('#(?:^|/)ai-training/([a-z-]+)(?:/)?$#', trim($path, '/'), $matches)) {
+                return trim((string) $matches[1]);
+            }
+            if (preg_match('~(?:^|/)ai-training/([a-z-]+)(?:[?#].*)?$~', $value, $matches)) {
+                return trim((string) $matches[1]);
+            }
         }
 
         return trim((string) ($_GET['section'] ?? 'summary'));
