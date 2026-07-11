@@ -6,6 +6,7 @@ namespace App\Repositories;
 
 use App\Core\Database;
 use PDO;
+use RuntimeException;
 use Throwable;
 
 final class AITrainingRepository
@@ -62,13 +63,11 @@ final class AITrainingRepository
 
     public function saveOnboardingAnswer(int $companyId, int $userId, string $questionKey, string $answer): void
     {
-        if (!$this->ready()) {
-            return;
-        }
+        $this->ensureReady();
 
         $questions = $this->questions();
         if (!isset($questions[$questionKey])) {
-            return;
+            throw new RuntimeException('La pregunta de entrenamiento no existe.');
         }
 
         $session = $this->session($companyId, $userId);
@@ -93,9 +92,7 @@ final class AITrainingRepository
 
     public function saveProfile(int $companyId, int $userId, array $input): void
     {
-        if (!$this->ready()) {
-            return;
-        }
+        $this->ensureReady();
 
         Database::connection()->prepare(
             'INSERT INTO ai_company_profiles
@@ -123,9 +120,7 @@ final class AITrainingRepository
 
     public function publishProfile(int $companyId, int $userId): void
     {
-        if (!$this->ready()) {
-            return;
-        }
+        $this->ensureReady();
 
         Database::connection()->prepare('UPDATE ai_company_profiles SET status = "published", published_at = CURRENT_TIMESTAMP, updated_by = :user_id WHERE company_id = :company_id')
             ->execute(['company_id' => $companyId, 'user_id' => $userId ?: null]);
@@ -137,9 +132,7 @@ final class AITrainingRepository
 
     public function savePersonality(int $companyId, int $userId, array $input): void
     {
-        if (!$this->ready()) {
-            return;
-        }
+        $this->ensureReady();
 
         Database::connection()->prepare(
             'INSERT INTO ai_personalities
@@ -167,8 +160,9 @@ final class AITrainingRepository
 
     public function addProduct(int $companyId, int $userId, array $input): void
     {
-        if (!$this->ready() || trim((string) ($input['name'] ?? '')) === '') {
-            return;
+        $this->ensureReady();
+        if (trim((string) ($input['name'] ?? '')) === '') {
+            throw new RuntimeException('El nombre del producto o servicio es obligatorio.');
         }
 
         Database::connection()->prepare(
@@ -197,8 +191,9 @@ final class AITrainingRepository
 
     public function addRule(int $companyId, int $userId, array $input): void
     {
-        if (!$this->ready() || trim((string) ($input['name'] ?? '')) === '') {
-            return;
+        $this->ensureReady();
+        if (trim((string) ($input['name'] ?? '')) === '') {
+            throw new RuntimeException('El nombre de la regla es obligatorio.');
         }
 
         Database::connection()->prepare(
@@ -222,8 +217,9 @@ final class AITrainingRepository
 
     public function addFaq(int $companyId, int $userId, array $input): void
     {
-        if (!$this->ready() || trim((string) ($input['question'] ?? '')) === '' || trim((string) ($input['approved_answer'] ?? '')) === '') {
-            return;
+        $this->ensureReady();
+        if (trim((string) ($input['question'] ?? '')) === '' || trim((string) ($input['approved_answer'] ?? '')) === '') {
+            throw new RuntimeException('La pregunta y respuesta aprobada son obligatorias.');
         }
 
         $status = $this->status($input['status'] ?? 'published');
@@ -249,8 +245,9 @@ final class AITrainingRepository
 
     public function addExample(int $companyId, int $userId, array $input): void
     {
-        if (!$this->ready() || trim((string) ($input['customer_message'] ?? '')) === '' || trim((string) ($input['ideal_response'] ?? '')) === '') {
-            return;
+        $this->ensureReady();
+        if (trim((string) ($input['customer_message'] ?? '')) === '' || trim((string) ($input['ideal_response'] ?? '')) === '') {
+            throw new RuntimeException('El mensaje del cliente y la respuesta ideal son obligatorios.');
         }
 
         $status = $this->status($input['status'] ?? 'published');
@@ -276,9 +273,7 @@ final class AITrainingRepository
 
     public function saveChannelSetting(int $companyId, array $input): void
     {
-        if (!$this->ready()) {
-            return;
-        }
+        $this->ensureReady();
 
         $channel = $this->text($input, 'channel', 60) ?: 'all';
         Database::connection()->prepare(
@@ -642,6 +637,13 @@ final class AITrainingRepository
             return true;
         } catch (Throwable) {
             return false;
+        }
+    }
+
+    private function ensureReady(): void
+    {
+        if (!$this->ready()) {
+            throw new RuntimeException('El esquema de Entrenamiento IA no esta instalado. Ejecuta database/upgrade_abilities.php.');
         }
     }
 
