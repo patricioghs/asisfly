@@ -9,6 +9,7 @@ use App\Repositories\AiProviderRepository;
 use App\Repositories\OmnichannelRepository;
 use App\Repositories\TenantRepository;
 use App\Services\OpenAiClient;
+use App\Services\WhatsAppEmbeddedSignup;
 use Throwable;
 
 final class IntegrationController extends Controller
@@ -101,7 +102,56 @@ final class IntegrationController extends Controller
             'accounts' => $repo->accounts($this->companyId()),
             'metrics' => $repo->accountMetrics($this->companyId()),
             'users' => $repo->companyUsers($this->companyId()),
+            'whatsappSignup' => (new WhatsAppEmbeddedSignup())->status(),
         ]);
+    }
+
+    public function whatsappConnect(): void
+    {
+        $this->requireAuth();
+
+        $signup = new WhatsAppEmbeddedSignup();
+        $config = $signup->publicConfig();
+        if (empty($config['configured'])) {
+            $_SESSION['flash_error'] = 'AsisFly aun no tiene configurado Meta Embedded Signup. Pide al Superadmin configurar Meta App ID y Configuration ID.';
+            $this->redirect('/integrations/accounts');
+        }
+
+        $this->view('integrations/whatsapp_connect', [
+            'title' => 'Conectar WhatsApp',
+            'config' => $config,
+        ]);
+    }
+
+    public function whatsappCallback(): void
+    {
+        $this->requireAuth();
+        $_SESSION['flash_success'] = 'Meta devolvio la autorizacion. Si el numero no aparece conectado, vuelve a finalizar el flujo desde la ventana de conexion.';
+        $this->redirect('/integrations/accounts');
+    }
+
+    public function whatsappEmbeddedResult(): void
+    {
+        $this->requireAuth();
+
+        $payload = json_decode((string) ($_POST['signup_payload'] ?? ''), true);
+        $payload = is_array($payload) ? $payload : [];
+        $data = $this->extractWhatsAppSignupData($payload);
+        $data['raw_signup'] = $payload;
+
+        if (($data['phone_number_id'] ?? '') === '' && ($data['display_phone_number'] ?? '') === '') {
+            $_SESSION['flash_error'] = 'Meta no entrego un numero WhatsApp valido. Revisa que el flujo haya finalizado correctamente.';
+            $this->redirect('/integrations/whatsapp/connect');
+        }
+
+        $accountId = (new OmnichannelRepository())->saveWhatsAppEmbeddedAccount($this->companyId(), $data);
+        if ($accountId > 0) {
+            $_SESSION['flash_success'] = 'WhatsApp conectado a AsisFly. Ya puede recibir mensajes y trabajar con supervision IA.';
+        } else {
+            $_SESSION['flash_error'] = 'No se pudo crear la cuenta WhatsApp conectada.';
+        }
+
+        $this->redirect('/integrations/accounts');
     }
 
     public function saveAccount(): void
@@ -110,6 +160,44 @@ final class IntegrationController extends Controller
         (new OmnichannelRepository())->saveAccount($this->companyId(), $_POST);
         $_SESSION['flash_success'] = 'Cuenta conectada creada en modo prueba.';
         $this->redirect('/integrations/accounts');
+    }
+
+    private function extractWhatsAppSignupData(array $payload): array
+    {
+        $flat = $this->flattenArray($payload);
+        $pick = function (array $keys) use ($flat): string {
+            foreach ($keys as $key) {
+                foreach ($flat as $path => $value) {
+                    if (str_ends_with($path, $key) && is_scalar($value) && trim((string) $value) !== '') {
+                        return trim((string) $value);
+                    }
+                }
+            }
+
+            return '';
+        };
+
+        return [
+            'waba_id' => $pick(['waba_id', 'whatsapp_business_account_id', 'business_account_id']),
+            'phone_number_id' => $pick(['phone_number_id']),
+            'display_phone_number' => $pick(['display_phone_number', 'phone_number', 'number']),
+            'business_name' => $pick(['business_name', 'verified_name', 'name']),
+        ];
+    }
+
+    private function flattenArray(array $value, string $prefix = ''): array
+    {
+        $flat = [];
+        foreach ($value as $key => $item) {
+            $path = $prefix === '' ? (string) $key : $prefix . '.' . (string) $key;
+            if (is_array($item)) {
+                $flat += $this->flattenArray($item, $path);
+            } else {
+                $flat[$path] = $item;
+            }
+        }
+
+        return $flat;
     }
 
     public function updateAccount(): void

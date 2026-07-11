@@ -144,6 +144,40 @@
 
         <div class="section-heading">
             <div>
+                <span class="eyebrow">Conexion en 2 clics</span>
+                <h3>Meta Embedded Signup</h3>
+                <p class="text-secondary mb-0">Activa el boton para que cada cliente conecte WhatsApp desde AsisFly sin copiar tokens, webhooks ni IDs tecnicos.</p>
+            </div>
+            <?php if (!empty($whatsappSignup['configured'])): ?>
+                <span class="status-pill success"><i class="bi bi-check2-circle"></i> Boton activo</span>
+            <?php else: ?>
+                <span class="status-pill warning"><i class="bi bi-exclamation-triangle"></i> Falta configurar</span>
+            <?php endif; ?>
+        </div>
+        <form method="post" action="<?= url('/admin/ai-tokens/platform-whatsapp-signup') ?>" class="row g-3 mb-4">
+            <?= csrf_field() ?>
+            <div class="col-md-3">
+                <label class="form-label">Meta App ID</label>
+                <input class="form-control" name="meta_app_id" placeholder="ID de la app Meta" autocomplete="off" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Configuration ID</label>
+                <input class="form-control" name="meta_config_id" placeholder="Config ID Embedded Signup" autocomplete="off" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">App Secret</label>
+                <input class="form-control" type="password" name="meta_app_secret" placeholder="Opcional para intercambio server-side" autocomplete="new-password">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100"><i class="bi bi-whatsapp"></i> Guardar</button>
+            </div>
+            <div class="col-12">
+                <small class="text-secondary">Estado actual: App <?= e((string) ($whatsappSignup['settings']['app_id'] ?? '')) ?> · Config <?= e((string) ($whatsappSignup['settings']['config_id'] ?? '')) ?> · Secret <?= e((string) ($whatsappSignup['settings']['app_secret'] ?? '')) ?></small>
+            </div>
+        </form>
+
+        <div class="section-heading">
+            <div>
                 <span class="eyebrow">Credenciales por empresa</span>
                 <h3>Excepciones por cliente</h3>
                 <p class="text-secondary mb-0">Opcional: usa esto solo si una empresa Enterprise quiere pagar o administrar su propia API key.</p>

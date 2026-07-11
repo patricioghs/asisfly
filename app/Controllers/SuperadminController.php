@@ -9,6 +9,7 @@ use App\Core\Database;
 use App\Repositories\AuthRepository;
 use App\Repositories\AiProviderRepository;
 use App\Repositories\TenantRepository;
+use App\Services\WhatsAppEmbeddedSignup;
 use PDOException;
 use Throwable;
 
@@ -82,6 +83,7 @@ final class SuperadminController extends Controller
             'cards' => (new TenantRepository())->aiUsage($this->companyId()),
             'platformCredential' => $aiRepo->platformCredentialStatus('openai'),
             'whatsappCredential' => $aiRepo->platformCredentialStatus('whatsapp_cloud'),
+            'whatsappSignup' => (new WhatsAppEmbeddedSignup())->status(),
             'credentials' => $aiRepo->companyCredentialStatus(),
             'type' => 'usage',
         ]);
@@ -145,6 +147,35 @@ final class SuperadminController extends Controller
         $this->redirect('/admin/ai-tokens');
     }
 
+    public function savePlatformWhatsAppSignup(): void
+    {
+        $this->requirePermission('*');
+
+        $appId = $this->normalizeMetaSetting((string) ($_POST['meta_app_id'] ?? ''));
+        $configId = $this->normalizeMetaSetting((string) ($_POST['meta_config_id'] ?? ''));
+        $appSecret = $this->normalizeMetaSetting((string) ($_POST['meta_app_secret'] ?? ''));
+
+        if ($appId === '' || $configId === '') {
+            $_SESSION['flash_error'] = 'Ingresa Meta App ID y Configuration ID para activar el boton Conectar WhatsApp.';
+            $this->redirect('/admin/ai-tokens');
+        }
+
+        try {
+            $repo = new AiProviderRepository();
+            $userId = (int) ($_SESSION['user']['id'] ?? 0);
+            $repo->savePlatformApiKey('whatsapp_meta_app_id', $appId, $userId);
+            $repo->savePlatformApiKey('whatsapp_meta_config_id', $configId, $userId);
+            if ($appSecret !== '') {
+                $repo->savePlatformApiKey('whatsapp_meta_app_secret', $appSecret, $userId);
+            }
+            $_SESSION['flash_success'] = 'Configuracion Meta Embedded Signup guardada.';
+        } catch (Throwable $exception) {
+            $_SESSION['flash_error'] = 'No se pudo guardar Embedded Signup: ' . $exception->getMessage();
+        }
+
+        $this->redirect('/admin/ai-tokens');
+    }
+
     public function saveOpenAiKey(): void
     {
         $this->requirePermission('*');
@@ -180,6 +211,11 @@ final class SuperadminController extends Controller
     private function normalizeMetaToken(string $apiKey): string
     {
         return trim($apiKey, " \t\n\r\0\x0B\"'");
+    }
+
+    private function normalizeMetaSetting(string $value): string
+    {
+        return trim($value, " \t\n\r\0\x0B\"'");
     }
 
     private function isValidOpenAiKey(string $apiKey): bool

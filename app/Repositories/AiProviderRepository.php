@@ -331,7 +331,17 @@ final class AiProviderRepository
     private function cleanProvider(string $provider): string
     {
         $provider = strtolower(trim($provider));
-        return in_array($provider, ['openai', 'anthropic', 'gemini', 'local', 'simulated', 'whatsapp_cloud'], true) ? $provider : 'simulated';
+        return in_array($provider, [
+            'openai',
+            'anthropic',
+            'gemini',
+            'local',
+            'simulated',
+            'whatsapp_cloud',
+            'whatsapp_meta_app_id',
+            'whatsapp_meta_config_id',
+            'whatsapp_meta_app_secret',
+        ], true) ? $provider : 'simulated';
     }
 
     private function fallbackKeySource(string $envName = 'OPENAI_API_KEY'): string

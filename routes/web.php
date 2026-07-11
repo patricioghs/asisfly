@@ -136,6 +136,9 @@ $router->get('/integrations', [IntegrationController::class, 'index']);
 $router->post('/integrations/ai', [IntegrationController::class, 'saveAi']);
 $router->post('/integrations/ai/test', [IntegrationController::class, 'testAi']);
 $router->get('/integrations/accounts', [IntegrationController::class, 'accounts']);
+$router->get('/integrations/whatsapp/connect', [IntegrationController::class, 'whatsappConnect']);
+$router->get('/integrations/whatsapp/callback', [IntegrationController::class, 'whatsappCallback']);
+$router->post('/integrations/whatsapp/embedded-result', [IntegrationController::class, 'whatsappEmbeddedResult']);
 $router->post('/integrations/accounts', [IntegrationController::class, 'saveAccount']);
 $router->post('/integrations/accounts/update', [IntegrationController::class, 'updateAccount']);
 $router->post('/integrations/accounts/credentials', [IntegrationController::class, 'saveAccountCredentials']);
@@ -162,6 +165,7 @@ $router->post('/admin/ai-tokens/platform-openai-key', [SuperadminController::cla
 $router->post('/admin/ai-tokens/platform-openai-key/delete', [SuperadminController::class, 'deletePlatformOpenAiKey']);
 $router->post('/admin/ai-tokens/platform-whatsapp-key', [SuperadminController::class, 'savePlatformWhatsAppKey']);
 $router->post('/admin/ai-tokens/platform-whatsapp-key/delete', [SuperadminController::class, 'deletePlatformWhatsAppKey']);
+$router->post('/admin/ai-tokens/platform-whatsapp-signup', [SuperadminController::class, 'savePlatformWhatsAppSignup']);
 $router->post('/admin/ai-tokens/openai-key', [SuperadminController::class, 'saveOpenAiKey']);
 $router->post('/admin/ai-tokens/openai-key/delete', [SuperadminController::class, 'deleteOpenAiKey']);
 $router->get('/admin/audit-logs', [SuperadminController::class, 'auditLogs']);

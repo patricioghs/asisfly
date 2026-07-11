@@ -15,8 +15,24 @@ $whatsAppWebhookUrl = $webhookHost !== '' ? $scheme . '://' . $webhookHost . url
         <h2>Cuentas conectadas</h2>
         <p>Administra todos los WhatsApp, correos, Gmail, Outlook, Instagram y Messenger de una empresa desde una sola plataforma.</p>
     </div>
-    <a class="btn btn-primary" href="<?= url('/inbox') ?>"><i class="bi bi-inboxes"></i> Ver bandeja</a>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-primary" href="<?= url('/integrations/whatsapp/connect') ?>"><i class="bi bi-whatsapp"></i> Conectar WhatsApp</a>
+        <a class="btn btn-outline-primary" href="<?= url('/inbox') ?>"><i class="bi bi-inboxes"></i> Ver bandeja</a>
+    </div>
 </section>
+
+<?php if (empty($whatsappSignup['configured'])): ?>
+    <section class="panel mt-4">
+        <div class="section-heading mb-0">
+            <div>
+                <span class="eyebrow">WhatsApp en 2 clics</span>
+                <h3>Boton pendiente de configuracion global</h3>
+                <p class="text-secondary mb-0">El Superadmin debe configurar Meta App ID y Configuration ID para que los clientes conecten WhatsApp sin datos tecnicos.</p>
+            </div>
+            <span class="status-pill warning"><i class="bi bi-exclamation-triangle"></i> Pendiente</span>
+        </div>
+    </section>
+<?php endif; ?>
 
 <section class="crm-metrics mt-4">
     <?php foreach ($metrics as $metric): ?>

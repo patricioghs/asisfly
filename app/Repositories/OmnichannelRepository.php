@@ -90,6 +90,75 @@ final class OmnichannelRepository
         ]);
     }
 
+    public function saveWhatsAppEmbeddedAccount(int $companyId, array $input): int
+    {
+        if (!$this->databaseReady()) {
+            return 0;
+        }
+
+        $phoneNumberId = trim((string) ($input['phone_number_id'] ?? ''));
+        $displayPhoneNumber = preg_replace('/\D+/', '', (string) ($input['display_phone_number'] ?? '')) ?: '';
+        $wabaId = trim((string) ($input['waba_id'] ?? ''));
+        $businessName = trim((string) ($input['business_name'] ?? ''));
+        $externalAccountId = $phoneNumberId !== '' ? $phoneNumberId : $displayPhoneNumber;
+        if ($externalAccountId === '') {
+            return 0;
+        }
+
+        $existing = $this->accountByProviderExternal('whatsapp_cloud', $externalAccountId);
+        if (!$existing && $displayPhoneNumber !== '') {
+            $existing = $this->accountByProviderExternal('whatsapp_cloud', $displayPhoneNumber);
+        }
+
+        $settings = [
+            'send_mode' => 'approval_required',
+            'embedded_signup' => true,
+            'whatsapp_phone_number_id' => $phoneNumberId,
+            'whatsapp_display_phone_number' => $displayPhoneNumber,
+            'whatsapp_business_account_id' => $wabaId,
+            'business_name' => $businessName,
+            'connected_at' => date('c'),
+            'raw_signup' => $input['raw_signup'] ?? null,
+        ];
+
+        if ($existing) {
+            $mergedSettings = array_merge($this->settings($existing), $settings);
+            Database::connection()->prepare('UPDATE omnichannel_accounts
+                SET display_name = :display_name,
+                    external_account_id = :external_account_id,
+                    channel = "WhatsApp",
+                    provider = "whatsapp_cloud",
+                    status = "sandbox",
+                    inbound_enabled = 1,
+                    outbound_enabled = 1,
+                    requires_approval = 1,
+                    brain_key = "commercial",
+                    settings_json = :settings_json,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE company_id = :company_id AND id = :id')->execute([
+                'display_name' => $businessName !== '' ? 'WhatsApp ' . $businessName : 'WhatsApp Empresa',
+                'external_account_id' => $externalAccountId,
+                'settings_json' => json_encode($mergedSettings, JSON_UNESCAPED_UNICODE),
+                'company_id' => $companyId,
+                'id' => (int) $existing['id'],
+            ]);
+
+            return (int) $existing['id'];
+        }
+
+        $statement = Database::connection()->prepare('INSERT INTO omnichannel_accounts (company_id, provider, channel, display_name, external_account_id, webhook_token, status, inbound_enabled, outbound_enabled, requires_approval, brain_key, assigned_user_id, settings_json)
+            VALUES (:company_id, "whatsapp_cloud", "WhatsApp", :display_name, :external_account_id, :webhook_token, "sandbox", 1, 1, 1, "commercial", NULL, :settings_json)');
+        $statement->execute([
+            'company_id' => $companyId,
+            'display_name' => $businessName !== '' ? 'WhatsApp ' . $businessName : 'WhatsApp Empresa',
+            'external_account_id' => $externalAccountId,
+            'webhook_token' => $this->webhookToken($companyId, 'whatsapp_cloud'),
+            'settings_json' => json_encode($settings, JSON_UNESCAPED_UNICODE),
+        ]);
+
+        return (int) Database::connection()->lastInsertId();
+    }
+
     public function updateAccount(int $companyId, int $accountId, array $input): void
     {
         if (!$this->databaseReady() || $accountId <= 0) {
