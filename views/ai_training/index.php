@@ -9,6 +9,7 @@ $products = $overview['products'] ?? [];
 $rules = $overview['rules'] ?? [];
 $faqs = $overview['faqs'] ?? [];
 $examples = $overview['examples'] ?? [];
+$autonomy = $overview['autonomy'] ?? ['learning_progress' => 0, 'label' => 'Aprendizaje supervisado'];
 $channels = $overview['channels'] ?? [];
 $prompt = $overview['prompt'] ?? [];
 $knowledgeSources = $overview['knowledgeSources'] ?? [];
@@ -422,12 +423,23 @@ $progress = (int) ($session['progress_percent'] ?? 0);
 <?php endif; ?>
 
 <?php if ($section === 'settings'): ?>
+    <section class="workbench-metrics mt-4">
+        <article class="metric-card"><span>Autonomia actual</span><strong><?= e((string) ($autonomy['learning_progress'] ?? 0)) ?>%</strong><small><?= e((string) ($autonomy['label'] ?? 'Aprendizaje supervisado')) ?></small></article>
+        <article class="metric-card"><span>Modo seguro</span><strong>Manual</strong><small>Solo sugiere y espera aprobacion.</small></article>
+        <article class="metric-card"><span>Modo asistido</span><strong>Copiloto</strong><small>Redacta, pero no envia solo.</small></article>
+        <article class="metric-card"><span>Modo automatico</span><strong>Controlado</strong><small>Solo envia si cumple confianza, riesgo y permisos.</small></article>
+    </section>
     <section class="controls-detail-grid mt-4">
         <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/channel') ?>">
             <?= csrf_field() ?>
             <div class="panel-title"><div><span class="eyebrow">Modo por canal</span><h2>Configurar autonomia</h2></div></div>
-            <select class="form-select" name="channel"><option value="all">Todos</option><option value="whatsapp">WhatsApp</option><option value="email">Correo</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option></select>
-            <select class="form-select" name="mode"><?php foreach ($modeLabels as $value => $label): ?><option value="<?= e($value) ?>"><?= e($label) ?></option><?php endforeach; ?></select>
+            <p class="text-secondary">La autonomia real combina progreso de aprendizaje, modo del canal, confianza minima, riesgo del mensaje y salida activa de la cuenta conectada.</p>
+            <select class="form-select" name="channel"><option value="all">Todos los canales</option><option value="whatsapp">WhatsApp</option><option value="email">Correo</option><option value="instagram">Instagram</option><option value="facebook">Facebook / Messenger</option></select>
+            <select class="form-select" name="mode">
+                <option value="manual">Manual - solo sugerir</option>
+                <option value="assisted">Asistido - preparar y pedir aprobacion</option>
+                <option value="automatic">Automatico - responder si es seguro</option>
+            </select>
             <input class="form-control" name="min_confidence" type="number" min="0" max="100" value="75" placeholder="Confianza minima">
             <input class="form-control" name="auto_reply_schedule" placeholder="Horario de respuesta automatica">
             <label class="form-check"><input class="form-check-input" type="checkbox" name="require_approval_for_sensitive" value="1" checked> <span class="form-check-label">Aprobar casos sensibles</span></label>
@@ -437,7 +449,11 @@ $progress = (int) ($session['progress_percent'] ?? 0);
             <div class="panel-title"><div><span class="eyebrow">Canales</span><h2>Configuracion actual</h2></div></div>
             <div class="control-entry-list">
                 <?php foreach ($channels as $channel): ?>
-                    <div><strong><?= e((string) $channel['channel']) ?></strong><span><?= e($modeLabels[$channel['mode']] ?? $channel['mode']) ?> / <?= e((string) $channel['min_confidence']) ?>%</span><small><?= e((string) ($channel['auto_reply_schedule'] ?? 'Sin horario especial')) ?></small></div>
+                    <div>
+                        <strong><?= e((string) $channel['channel']) ?></strong>
+                        <span><?= e($modeLabels[$channel['mode']] ?? $channel['mode']) ?> / confianza <?= e((string) $channel['min_confidence']) ?>% / sensibles <?= !empty($channel['require_approval_for_sensitive']) ? 'con aprobacion' : 'permitidos' ?></span>
+                        <small><?= e((string) ($channel['auto_reply_schedule'] ?? 'Sin horario especial')) ?></small>
+                    </div>
                 <?php endforeach; ?>
                 <?php if (!$channels): ?><p class="task-muted">Sin configuracion por canal. El modo seguro inicial es manual.</p><?php endif; ?>
             </div>

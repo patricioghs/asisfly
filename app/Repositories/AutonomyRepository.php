@@ -56,6 +56,7 @@ final class AutonomyRepository
             'executed' => 3,
             'corrected' => 1,
             'rejected' => 1,
+            'autonomous_executed' => 4,
             'suggested' => 0,
             default => 0,
         };

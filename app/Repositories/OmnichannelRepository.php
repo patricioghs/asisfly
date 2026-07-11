@@ -8,8 +8,10 @@ use App\Core\Database;
 use App\Repositories\ActionRepository;
 use App\Repositories\AutonomyRepository;
 use App\Services\ConnectionTester;
+use App\Services\AIResponseReviewService;
 use App\Services\OmnichannelCommercialAutomation;
 use App\Services\OmnichannelAiResponder;
+use App\Services\OmnichannelAutonomyPolicy;
 use App\Services\SecretVault;
 use App\Services\SmtpMailer;
 use PDO;
@@ -714,7 +716,14 @@ final class OmnichannelRepository
             return ['mode' => 'human_required', 'message' => 'AsisFly derivo la conversacion a supervision humana.'];
         }
 
-        $aiDraft = (new OmnichannelAiResponder())->draft($companyId, $account, $message, $decision, $this->conversationHistory($companyId, $conversationId));
+        $aiDraft = (new OmnichannelAiResponder())->draft(
+            $companyId,
+            $account,
+            $message,
+            $decision,
+            $this->conversationHistory($companyId, $conversationId),
+            !empty($account['assigned_user_id']) ? (int) $account['assigned_user_id'] : 0
+        );
         $draft = (string) $aiDraft['body'];
         $draftId = $this->insertAiDraft($companyId, $conversationId, $account, $draft);
 
@@ -755,6 +764,7 @@ final class OmnichannelRepository
                 'company_id' => $companyId,
                 'id' => $conversationId,
             ]);
+            (new AIResponseReviewService())->markGeneratedResponse($companyId, (int) ($aiDraft['generated_response_id'] ?? 0), 'sent');
             (new AutonomyRepository())->recordSignal($companyId, 'autonomous_executed');
 
             return ['mode' => 'auto_resolved', 'message' => 'AsisFly respondio automaticamente y registro auditoria.'];
@@ -781,41 +791,15 @@ final class OmnichannelRepository
     {
         $risk = $this->messageRisk((string) ($message['body'] ?? ''), (string) ($message['priority'] ?? 'medium'));
         $confidence = $this->messageConfidence((string) ($message['body'] ?? ''), $risk, $autonomy);
-        $requiresApproval = (new AutonomyRepository())->requiresApproval($autonomy, $risk);
-        $accountRequiresApproval = !empty($account['requires_approval']);
-        $outboundEnabled = !empty($account['outbound_enabled']);
-
-        if ($this->needsHuman((string) ($message['body'] ?? ''), $risk)) {
-            return [
-                'mode' => 'human_required',
-                'risk' => $risk,
-                'confidence' => $confidence,
-                'reason' => 'Mensaje sensible o ambiguo. Requiere criterio humano antes de responder.',
-                'autonomy_mode' => $autonomy['mode'] ?? 'supervised_learning',
-            ];
-        }
-
-        if ($accountRequiresApproval || $requiresApproval || !$outboundEnabled || $confidence < 82) {
-            $reason = !$outboundEnabled
-                ? 'La cuenta no tiene salida real activa.'
-                : ($accountRequiresApproval ? 'La cuenta exige aprobacion humana.' : 'La autonomia actual requiere aprobacion para este riesgo.');
-
-            return [
-                'mode' => 'approval_required',
-                'risk' => $risk,
-                'confidence' => $confidence,
-                'reason' => $reason,
-                'autonomy_mode' => $autonomy['mode'] ?? 'supervised_learning',
-            ];
-        }
-
-        return [
-            'mode' => 'auto_resolved',
-            'risk' => $risk,
-            'confidence' => $confidence,
-            'reason' => 'Consulta simple, cuenta con salida activa y autonomia suficiente.',
-            'autonomy_mode' => $autonomy['mode'] ?? 'supervised_learning',
-        ];
+        return (new OmnichannelAutonomyPolicy())->decide(
+            (int) ($account['company_id'] ?? 0),
+            $account,
+            $message,
+            $autonomy,
+            $risk,
+            $confidence,
+            $this->needsHuman((string) ($message['body'] ?? ''), $risk)
+        );
     }
 
     private function insertAiDraft(int $companyId, int $conversationId, array $account, string $draft): int
