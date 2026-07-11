@@ -2598,6 +2598,59 @@ a {
   line-height: 1;
 }
 
+.supervision-audit-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.supervision-audit-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.supervision-audit-grid article {
+  background: linear-gradient(180deg, #ffffff 0%, var(--asisty-surface-soft) 100%);
+  border: 1px solid var(--asisty-border);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.supervision-audit-grid span,
+.supervision-audit-grid small {
+  color: var(--asisty-muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.supervision-audit-grid strong {
+  color: var(--asisty-text);
+  display: block;
+  font-size: 1.55rem;
+  font-weight: 900;
+  margin: 5px 0;
+}
+
+.supervision-policy-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.supervision-policy-list span {
+  align-items: center;
+  background: var(--asisty-surface-soft);
+  border: 1px solid var(--asisty-border);
+  border-radius: 999px;
+  color: var(--asisty-muted);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 7px;
+  padding: 8px 11px;
+}
+
 .inbox-layout {
   align-items: start;
   display: grid;
@@ -3569,6 +3622,10 @@ a {
   .supervision-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .supervision-audit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
@@ -3580,6 +3637,7 @@ a {
   .performance-summary,
   .integration-strip,
   .approval-metrics,
+  .supervision-audit-grid,
   .marketplace-grid,
   .marketplace-summary,
   .workbench-metrics,

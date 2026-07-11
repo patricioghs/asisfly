@@ -16,6 +16,11 @@ $aiStateOptions = [
     'closed' => 'Cerrada',
 ];
 $latestDraft = $selected['latest_draft'] ?? null;
+$supervisionReport = $supervisionReport ?? ['decisionCounts' => [], 'generatedCounts' => [], 'channels' => [], 'recentContexts' => []];
+$decisionCounts = $supervisionReport['decisionCounts'] ?? [];
+$generatedCounts = $supervisionReport['generatedCounts'] ?? [];
+$channelSettings = $supervisionReport['channels'] ?? [];
+$recentContexts = $supervisionReport['recentContexts'] ?? [];
 $filterQuery = http_build_query(array_filter($filters ?? [], fn ($value) => $value !== ''));
 $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(array_filter([...($filters ?? []), ...$extra], fn ($value) => $value !== '')));
 ?>
@@ -31,6 +36,51 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
         <?php endforeach; ?>
     </div>
 </div>
+
+<section class="panel mt-4 supervision-audit-panel">
+    <div class="panel-title">
+        <div>
+            <span class="eyebrow">Auditoria del trabajador virtual</span>
+            <h2>Decisiones, autonomia y contexto usado</h2>
+        </div>
+        <a class="soft-badge" href="<?= url('/ai-training?section=settings') ?>">Ajustar autonomia <i class="bi bi-arrow-right"></i></a>
+    </div>
+    <div class="supervision-audit-grid">
+        <article>
+            <span>Por aprobar</span>
+            <strong><?= e((string) ($decisionCounts['approval_required'] ?? 0)) ?></strong>
+            <small>Respuestas listas con revision humana.</small>
+        </article>
+        <article>
+            <span>Derivadas a humano</span>
+            <strong><?= e((string) ($decisionCounts['human_required'] ?? 0)) ?></strong>
+            <small>Casos sensibles o ambiguos.</small>
+        </article>
+        <article>
+            <span>Automaticas</span>
+            <strong><?= e((string) ($decisionCounts['auto_resolved'] ?? 0)) ?></strong>
+            <small>Enviadas solo si cumplen politica.</small>
+        </article>
+        <article>
+            <span>Generadas IA</span>
+            <strong><?= e((string) array_sum(array_map('intval', $generatedCounts))) ?></strong>
+            <small><?= e((string) ($generatedCounts['sent'] ?? 0)) ?> enviadas, <?= e((string) ($generatedCounts['edited'] ?? 0)) ?> editadas.</small>
+        </article>
+    </div>
+    <div class="supervision-policy-list">
+        <?php foreach (array_slice($channelSettings, 0, 5) as $setting): ?>
+            <span><i class="bi bi-sliders"></i><?= e((string) $setting['channel']) ?>: <?= e((string) $setting['mode']) ?> / <?= e((string) $setting['min_confidence']) ?>%</span>
+        <?php endforeach; ?>
+        <?php if (!$channelSettings): ?><span><i class="bi bi-shield-lock"></i>Sin reglas por canal: modo manual seguro.</span><?php endif; ?>
+    </div>
+    <?php if ($recentContexts): ?>
+        <div class="supervision-policy-list">
+            <?php foreach ($recentContexts as $context): ?>
+                <span><i class="bi bi-database-check"></i>Contexto #<?= e((string) $context['id']) ?> / <?= e((string) $context['token_estimate']) ?> tokens</span>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
 
 <div class="inbox-layout mt-4">
     <aside class="panel inbox-list supervision-list">
@@ -156,7 +206,10 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                                 <p><?= e($event['reason'] ?? '') ?></p>
                                 <small>Riesgo <?= e($event['risk'] ?? 'medium') ?> - <?= e((string) ($event['confidence'] ?? 0)) ?>% confianza - <?= e($event['created_at'] ?? '') ?></small>
                                 <?php if (!empty($event['draft_status'])): ?>
-                                    <small>Respuesta: <?= e($event['draft_status']) ?> / <?= e($event['draft_provider'] ?: 'simulated') ?> <?= e($event['draft_model'] ?? '') ?> - memoria <?= e((string) ($event['memory_hits'] ?? 0)) ?></small>
+                                    <small>Respuesta: <?= e($event['draft_status']) ?> / <?= e($event['draft_provider'] ?: 'simulated') ?> <?= e($event['draft_model'] ?? '') ?> - memoria <?= e((string) ($event['memory_hits'] ?? 0)) ?> - conocimiento <?= e((string) ($event['knowledge_hits'] ?? 0)) ?></small>
+                                <?php endif; ?>
+                                <?php if (!empty($event['channel_mode'])): ?>
+                                    <small>Politica: canal <?= e($event['channel_mode']) ?><?= !empty($event['min_confidence']) ? ' / minimo ' . e((string) $event['min_confidence']) . '%' : '' ?><?= !empty($event['context_log_id']) ? ' / contexto #' . e((string) $event['context_log_id']) : '' ?></small>
                                 <?php endif; ?>
                                 <?php if (!empty($event['commercial_ok'])): ?>
                                     <small>CRM: <?= e(implode(', ', $event['commercial_actions'] ?? [])) ?><?= !empty($event['commercial_customer_id']) ? ' - cliente #' . e((string) $event['commercial_customer_id']) : '' ?></small>

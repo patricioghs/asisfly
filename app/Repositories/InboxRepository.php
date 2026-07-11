@@ -142,6 +142,25 @@ final class InboxRepository
         ];
     }
 
+    public function supervisionReport(int $companyId): array
+    {
+        if (!$this->databaseReady()) {
+            return [
+                'decisionCounts' => [],
+                'generatedCounts' => [],
+                'channels' => [],
+                'recentContexts' => [],
+            ];
+        }
+
+        return [
+            'decisionCounts' => $this->decisionCounts($companyId),
+            'generatedCounts' => $this->generatedResponseCounts($companyId),
+            'channels' => $this->channelAutonomySettings($companyId),
+            'recentContexts' => $this->recentContextLogs($companyId),
+        ];
+    }
+
     public function suggestReply(int $companyId, int $conversationId, int $userId): void
     {
         $conversation = $this->selectedConversation($companyId, $conversationId);
@@ -564,6 +583,11 @@ final class InboxRepository
                     'draft_provider' => (string) ($payload['ai_draft']['provider'] ?? ''),
                     'draft_model' => (string) ($payload['ai_draft']['model'] ?? ''),
                     'memory_hits' => (int) ($payload['ai_draft']['memory_hits'] ?? 0),
+                    'knowledge_hits' => (int) ($payload['ai_draft']['knowledge_hits'] ?? 0),
+                    'context_log_id' => (int) ($payload['ai_draft']['context_log_id'] ?? 0),
+                    'generated_response_id' => (int) ($payload['ai_draft']['generated_response_id'] ?? 0),
+                    'channel_mode' => (string) ($decision['channel_mode'] ?? ''),
+                    'min_confidence' => (int) ($decision['min_confidence'] ?? 0),
                     'commercial_ok' => (bool) ($payload['commercial_automation']['ok'] ?? false),
                     'commercial_customer_id' => (int) ($payload['commercial_automation']['customer_id'] ?? 0),
                     'commercial_actions' => $payload['commercial_automation']['actions'] ?? [],
@@ -571,6 +595,62 @@ final class InboxRepository
                     'created_at' => (string) ($row['created_at'] ?? ''),
                 ];
             }, $statement->fetchAll(PDO::FETCH_ASSOC))));
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function decisionCounts(int $companyId): array
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT payload_json FROM omnichannel_events WHERE company_id = :company_id AND payload_json LIKE :needle ORDER BY id DESC LIMIT 200');
+            $statement->execute(['company_id' => $companyId, 'needle' => '%"ai_decision"%']);
+            $counts = ['approval_required' => 0, 'human_required' => 0, 'auto_resolved' => 0];
+            foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+                $mode = is_array($payload) ? (string) ($payload['ai_decision']['mode'] ?? '') : '';
+                if (isset($counts[$mode])) {
+                    $counts[$mode]++;
+                }
+            }
+            return $counts;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function generatedResponseCounts(int $companyId): array
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT status, COUNT(*) AS total FROM ai_generated_responses WHERE company_id = :company_id AND module = "Omnicanal" GROUP BY status');
+            $statement->execute(['company_id' => $companyId]);
+            $counts = ['draft' => 0, 'approved' => 0, 'edited' => 0, 'rejected' => 0, 'sent' => 0];
+            foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $counts[(string) $row['status']] = (int) $row['total'];
+            }
+            return $counts;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function channelAutonomySettings(int $companyId): array
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT channel, mode, min_confidence, require_approval_for_sensitive, status FROM ai_channel_settings WHERE company_id = :company_id ORDER BY FIELD(channel, "all", "email", "whatsapp", "instagram", "facebook"), channel');
+            $statement->execute(['company_id' => $companyId]);
+            return $statement->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function recentContextLogs(int $companyId): array
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT id, module, query_text, token_estimate, created_at FROM ai_context_logs WHERE company_id = :company_id AND module = "Omnicanal" ORDER BY id DESC LIMIT 5');
+            $statement->execute(['company_id' => $companyId]);
+            return $statement->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Throwable) {
             return [];
         }

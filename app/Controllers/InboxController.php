@@ -30,6 +30,7 @@ final class InboxController extends Controller
             'conversations' => $repo->conversations($this->companyId(), $filters),
             'selected' => $repo->selectedConversation($this->companyId(), (int) ($_GET['id'] ?? 0), $filters),
             'metrics' => $repo->metrics($this->companyId()),
+            'supervisionReport' => $repo->supervisionReport($this->companyId()),
             'accounts' => (new OmnichannelRepository())->accounts($this->companyId()),
         ]);
     }
