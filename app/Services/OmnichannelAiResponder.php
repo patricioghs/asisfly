@@ -12,7 +12,7 @@ use Throwable;
 
 final class OmnichannelAiResponder
 {
-    public function draft(int $companyId, array $account, array $message, array $decision, array $history = []): array
+    public function draft(int $companyId, array $account, array $message, array $decision, array $history = [], int $userId = 0): array
     {
         $fallback = $this->fallbackDraft($account, $message);
         $settingsRepo = new AiProviderRepository();
@@ -44,8 +44,14 @@ final class OmnichannelAiResponder
         $explicitTools = $toolRegistry->resolveTools($companyId, $systemUser, ['omnichannel.assist', 'memory.search']);
         $aiContext['tools']['allowed'] = array_merge($aiContext['tools']['allowed'] ?? [], $explicitTools['allowed']);
         $aiContext['tools']['blocked'] = array_merge($aiContext['tools']['blocked'] ?? [], $explicitTools['blocked']);
+        $trainingBuilder = new AITrainingContextBuilder();
+        $trainingContext = $trainingBuilder->build($companyId, $prompt, $history);
+        $trainingPrompt = $trainingBuilder->renderForPrompt($trainingContext);
+        $knowledgeSources = $trainingContext['knowledge'] ?: ($trainingContext['documents'] ?? []);
+        $knowledge = new KnowledgeRetrievalService();
+        $contextLogId = $knowledge->logContext($companyId, $userId, 'Omnicanal', $prompt, $knowledgeSources, $trainingPrompt);
         $memory = $contextBuilder->isToolAllowed($aiContext, 'memory.search')
-            ? (new MemoryRepository())->search($companyId, $prompt, 4)
+            ? ($trainingContext['documents'] ?: (new MemoryRepository())->search($companyId, $prompt, 4))
             : [];
 
         if (!$contextBuilder->isToolAllowed($aiContext, 'omnichannel.assist')) {
@@ -69,6 +75,7 @@ final class OmnichannelAiResponder
                     'route' => $route,
                     'memory' => $memory,
                     'ai_context' => $aiContext,
+                    'training_context' => $trainingPrompt,
                     'history' => $this->historyForOpenAi($history),
                 ]);
                 $draft = $this->cleanDraft((string) $real['text'], $assistant, $fallback);
@@ -106,7 +113,26 @@ final class OmnichannelAiResponder
                 'account_id' => $account['id'] ?? null,
                 'decision' => $decision,
                 'memory_hits' => count($memory),
+                'knowledge_hits' => count($knowledgeSources),
+                'context_log_id' => $contextLogId,
             ],
+        ]);
+
+        $generatedResponseId = $knowledge->recordGeneratedResponse($companyId, $userId, $contextLogId, [
+            'module' => 'Omnicanal',
+            'channel' => (string) ($account['channel'] ?? 'omnichannel'),
+            'customer_message' => (string) ($message['body'] ?? ''),
+            'generated_response' => $draft,
+            'confidence' => (int) ($decision['confidence'] ?? 0),
+            'sources' => [
+                'documents' => count($trainingContext['documents'] ?? []),
+                'knowledge' => count($trainingContext['knowledge'] ?? []),
+                'faqs' => count($trainingContext['faqs'] ?? []),
+                'products' => count($trainingContext['products'] ?? []),
+                'examples' => count($trainingContext['examples'] ?? []),
+                'context_log_id' => $contextLogId,
+            ],
+            'status' => 'draft',
         ]);
 
         return [
@@ -116,6 +142,10 @@ final class OmnichannelAiResponder
             'model' => $model,
             'error' => $errorMessage,
             'memory_hits' => count($memory),
+            'knowledge_hits' => count($knowledgeSources),
+            'context_log_id' => $contextLogId,
+            'generated_response_id' => $generatedResponseId,
+            'confidence' => (int) ($decision['confidence'] ?? 0),
         ];
     }
 

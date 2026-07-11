@@ -36,6 +36,7 @@ final class AITrainingRepository
             'knowledgeStats' => $this->knowledgeStats($companyId),
             'knowledgeQuery' => trim((string) ($_GET['knowledge_q'] ?? '')),
             'knowledgeResults' => $this->knowledgeResults($companyId, trim((string) ($_GET['knowledge_q'] ?? '')), 8),
+            'responseReviews' => $this->responseReviews($companyId, 12),
         ];
     }
 
@@ -308,10 +309,28 @@ final class AITrainingRepository
             'products' => $this->searchRows('ai_products', $companyId, $query, 'name, description', $limit),
             'faqs' => $this->searchRows('ai_faqs', $companyId, $query, 'question, variants, approved_answer', $limit),
             'examples' => $this->searchRows('ai_conversation_examples', $companyId, $query, 'customer_message, ideal_response', $limit),
+            'reviews' => $this->reviewExamples($companyId, $limit),
             'knowledge' => $this->knowledgeResults($companyId, $query, $limit),
             'channels' => $this->channelSettings($companyId),
             'prompt' => $this->activePrompt(),
         ];
+    }
+
+    public function responseReviews(int $companyId, int $limit = 20): array
+    {
+        if (!$this->reviewsReady()) {
+            return [];
+        }
+
+        return $this->rows(
+            'SELECT r.*, u.name AS reviewer_name
+             FROM ai_response_reviews r
+             LEFT JOIN users u ON u.id = r.reviewed_by
+             WHERE r.company_id = :company_id
+             ORDER BY r.reviewed_at DESC, r.id DESC
+             LIMIT ' . max(1, min(50, $limit)),
+            ['company_id' => $companyId]
+        );
     }
 
     public function knowledgeSources(int $companyId, int $limit = 12): array
@@ -549,6 +568,10 @@ final class AITrainingRepository
 
     private function reviewMetrics(int $companyId): array
     {
+        if (!$this->reviewsReady()) {
+            return ['approved' => 0, 'edited' => 0, 'rejected' => 0];
+        }
+
         $rows = $this->rows('SELECT result, COUNT(*) AS total FROM ai_response_reviews WHERE company_id = :company_id GROUP BY result', ['company_id' => $companyId]);
         $metrics = ['approved' => 0, 'edited' => 0, 'rejected' => 0];
         foreach ($rows as $row) {
@@ -574,6 +597,25 @@ final class AITrainingRepository
             }
         }
         return $metrics;
+    }
+
+    private function reviewExamples(int $companyId, int $limit): array
+    {
+        if (!$this->reviewsReady()) {
+            return [];
+        }
+
+        return $this->rows(
+            'SELECT customer_message, ai_response, final_response, result, difference_summary, channel, intent
+             FROM ai_response_reviews
+             WHERE company_id = :company_id
+               AND result IN ("approved", "edited")
+               AND final_response IS NOT NULL
+               AND final_response <> ""
+             ORDER BY reviewed_at DESC, id DESC
+             LIMIT ' . max(1, $limit),
+            ['company_id' => $companyId]
+        );
     }
 
     private function rows(string $sql, array $params = []): array
@@ -614,6 +656,7 @@ final class AITrainingRepository
             'rules' => [],
             'faqs' => [],
             'examples' => [],
+            'responseReviews' => [],
             'channels' => [],
             'prompt' => [],
             'knowledgeSources' => [],
@@ -628,6 +671,16 @@ final class AITrainingRepository
         try {
             Database::connection()->query('SELECT 1 FROM ai_knowledge_sources LIMIT 1');
             Database::connection()->query('SELECT 1 FROM ai_knowledge_chunks LIMIT 1');
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function reviewsReady(): bool
+    {
+        try {
+            Database::connection()->query('SELECT 1 FROM ai_response_reviews LIMIT 1');
             return true;
         } catch (Throwable) {
             return false;

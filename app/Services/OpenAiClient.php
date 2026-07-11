@@ -106,6 +106,7 @@ final class OpenAiClient
             'Idioma principal: ' . ($assistant['language'] ?? 'Espanol latino'),
             'Reglas de atencion: ' . ($assistant['rules'] ?? 'Pedir aprobacion antes de acciones sensibles.'),
             'Escalar a humano cuando: ' . ($assistant['human_escalation'] ?? 'Riesgo comercial, legal o cliente molesto.'),
+            $this->trainingPrompt($context['training_context'] ?? ''),
             $this->memoryPrompt($memory),
             'Usa el historial reciente para interpretar respuestas cortas como "si", "ok" o "dale".',
             'Responde de forma util, accionable y breve. No inventes datos internos; si falta informacion, indica el supuesto.',
@@ -177,6 +178,16 @@ final class OpenAiClient
         }
 
         return implode("\n", $parts);
+    }
+
+    private function trainingPrompt(mixed $context): string
+    {
+        $context = trim((string) $context);
+        if ($context === '') {
+            return '';
+        }
+
+        return "Entrenamiento empresarial autorizado:\n" . substr($context, 0, 9000);
     }
 
     private function extractText(array $response): string

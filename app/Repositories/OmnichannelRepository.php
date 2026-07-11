@@ -904,6 +904,10 @@ final class OmnichannelRepository
             'provider' => $aiDraft['provider'] ?? 'simulated',
             'model' => $aiDraft['model'] ?? 'asisfly-demo-latam',
             'memory_hits' => $aiDraft['memory_hits'] ?? 0,
+            'knowledge_hits' => $aiDraft['knowledge_hits'] ?? 0,
+            'context_log_id' => $aiDraft['context_log_id'] ?? null,
+            'generated_response_id' => $aiDraft['generated_response_id'] ?? null,
+            'confidence' => $aiDraft['confidence'] ?? null,
             'error' => $aiDraft['error'] ?? null,
         ];
     }

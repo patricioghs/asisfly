@@ -6,6 +6,8 @@ namespace App\Repositories;
 
 use App\Core\Database;
 use App\Repositories\AutonomyRepository;
+use App\Services\AIResponseReviewService;
+use App\Services\OmnichannelAiResponder;
 use PDO;
 
 final class InboxRepository
@@ -148,7 +150,24 @@ final class InboxRepository
         }
 
         $lastInbound = $this->lastInboundMessage($conversation);
+        $lastInboundRow = $this->lastInboundRow($conversation);
         $reply = $this->draftReply($conversation, $lastInbound);
+        $draftTrace = [];
+
+        try {
+            $aiDraft = (new OmnichannelAiResponder())->draft(
+                $companyId,
+                $this->accountPayload($conversation),
+                $this->messagePayload($conversation, $lastInboundRow, $lastInbound),
+                $this->decisionPayload($conversation),
+                $conversation['messages'] ?? [],
+                $userId
+            );
+            $reply = (string) ($aiDraft['body'] ?? $reply);
+            $draftTrace = $aiDraft;
+        } catch (\Throwable) {
+            $draftTrace = [];
+        }
 
         if (!$this->databaseReady()) {
             $_SESSION['inbox_suggestions'][] = $reply;
@@ -167,6 +186,11 @@ final class InboxRepository
             'ai_generated' => 1,
             'status' => 'draft',
         ]);
+        $draftId = (int) Database::connection()->lastInsertId();
+
+        if (!empty($draftTrace)) {
+            $this->logTrainingTrace($companyId, $conversationId, $conversation, $draftTrace, $draftId);
+        }
 
         Database::connection()->prepare('UPDATE inbox_conversations SET status = "pending_approval" WHERE company_id = :company_id AND id = :id')->execute([
             'company_id' => $companyId,
@@ -200,6 +224,7 @@ final class InboxRepository
 
         $draft = $this->latestDraft($companyId, $conversationId);
         if ($draft) {
+            $previousBody = trim((string) ($draft['body'] ?? ''));
             Database::connection()->prepare('UPDATE inbox_messages SET body = :body, sender_name = :sender_name, status = "draft" WHERE company_id = :company_id AND id = :id')->execute([
                 'body' => $body,
                 'sender_name' => !empty($draft['ai_generated']) ? 'AsisFly editado por ' . $userName : $userName,
@@ -207,6 +232,21 @@ final class InboxRepository
                 'id' => (int) $draft['id'],
             ]);
             if (!empty($draft['ai_generated']) && trim((string) $draft['body']) !== $body) {
+                (new AIResponseReviewService())->record($companyId, [
+                    'conversation_id' => $conversationId,
+                    'message_id' => (int) $draft['id'],
+                    'customer_message' => $this->lastInboundMessage($conversation),
+                    'ai_response' => $previousBody,
+                    'final_response' => $body,
+                    'reviewed_by' => $userId,
+                    'result' => 'edited',
+                    'correction_reason' => 'Edicion manual desde Centro de Supervision.',
+                    'channel' => $conversation['channel'] ?? null,
+                    'intent' => $conversation['subject'] ?? null,
+                    'confidence' => $conversation['ai_confidence'] ?? null,
+                    'sources' => $this->latestDraftTrace($companyId, $conversationId),
+                    'generated_response_id' => $this->latestGeneratedResponseId($companyId, $conversationId),
+                ]);
                 (new AutonomyRepository())->recordSignal($companyId, 'corrected');
             }
         } else {
@@ -268,6 +308,29 @@ final class InboxRepository
             'id' => $conversationId,
         ]);
 
+        if (!empty($draft['ai_generated'])) {
+            $trace = $this->latestDraftTrace($companyId, $conversationId);
+            $generatedResponseId = $this->latestGeneratedResponseId($companyId, $conversationId);
+            if (!$this->reviewExists($companyId, (int) $draft['id'])) {
+                (new AIResponseReviewService())->record($companyId, [
+                    'conversation_id' => $conversationId,
+                    'message_id' => (int) $draft['id'],
+                    'customer_message' => $this->lastInboundMessage($conversation),
+                    'ai_response' => (string) ($draft['body'] ?? ''),
+                    'final_response' => (string) ($draft['body'] ?? ''),
+                    'reviewed_by' => $userId,
+                    'result' => str_contains((string) ($draft['sender_name'] ?? ''), 'editado') ? 'edited' : 'approved',
+                    'correction_reason' => 'Aprobacion y envio desde Centro de Supervision.',
+                    'channel' => $conversation['channel'] ?? null,
+                    'intent' => $conversation['subject'] ?? null,
+                    'confidence' => $conversation['ai_confidence'] ?? null,
+                    'sources' => $trace,
+                    'generated_response_id' => $generatedResponseId,
+                ]);
+            }
+            (new AIResponseReviewService())->markGeneratedResponse($companyId, $generatedResponseId, 'sent');
+        }
+
         (new AutonomyRepository())->recordSignal($companyId, 'executed');
         return $result;
     }
@@ -309,6 +372,13 @@ final class InboxRepository
         $messages = $conversation['messages'] ?? [];
         $inbound = array_values(array_filter($messages, fn (array $message) => ($message['direction'] ?? '') === 'inbound'));
         return (string) ($inbound[array_key_last($inbound)]['body'] ?? ($conversation['last_message'] ?? ''));
+    }
+
+    private function lastInboundRow(array $conversation): array
+    {
+        $messages = $conversation['messages'] ?? [];
+        $inbound = array_values(array_filter($messages, fn (array $message) => ($message['direction'] ?? '') === 'inbound'));
+        return $inbound ? (array) $inbound[array_key_last($inbound)] : [];
     }
 
     private function latestDraft(int $companyId, int $conversationId): ?array
@@ -503,6 +573,106 @@ final class InboxRepository
             }, $statement->fetchAll(PDO::FETCH_ASSOC))));
         } catch (\Throwable) {
             return [];
+        }
+    }
+
+    private function accountPayload(array $conversation): array
+    {
+        return [
+            'id' => (int) ($conversation['account_id'] ?? 0),
+            'display_name' => (string) (($conversation['account_name'] ?? '') ?: ($conversation['channel'] ?? 'Cuenta conectada')),
+            'provider' => (string) ($conversation['provider'] ?? 'unknown'),
+            'channel' => (string) ($conversation['channel'] ?? 'Omnicanal'),
+            'brain_key' => (string) (($conversation['account_brain'] ?? '') ?: 'commercial'),
+        ];
+    }
+
+    private function messagePayload(array $conversation, array $lastInboundRow, string $lastInbound): array
+    {
+        return [
+            'customer_name' => (string) ($conversation['customer_name'] ?? ($lastInboundRow['sender_name'] ?? 'Cliente')),
+            'customer_handle' => (string) ($conversation['customer_handle'] ?? ''),
+            'subject' => (string) ($conversation['subject'] ?? 'Nueva conversacion'),
+            'body' => $lastInbound,
+            'priority' => (string) ($conversation['priority'] ?? 'medium'),
+        ];
+    }
+
+    private function decisionPayload(array $conversation): array
+    {
+        return [
+            'mode' => 'approval_required',
+            'risk' => (string) ($conversation['priority'] ?? 'medium'),
+            'confidence' => (int) ($conversation['ai_confidence'] ?? 72),
+            'reason' => 'Sugerencia solicitada por humano desde Centro de Supervision.',
+        ];
+    }
+
+    private function logTrainingTrace(int $companyId, int $conversationId, array $conversation, array $draftTrace, int $draftId): void
+    {
+        try {
+            Database::connection()->prepare(
+                'INSERT INTO omnichannel_events (company_id, account_id, conversation_id, provider, channel, direction, event_type, status, payload_json)
+                 VALUES (:company_id, :account_id, :conversation_id, :provider, :channel, "outbound", "ai_training_trace", "queued", :payload_json)'
+            )->execute([
+                'company_id' => $companyId,
+                'account_id' => !empty($conversation['account_id']) ? (int) $conversation['account_id'] : null,
+                'conversation_id' => $conversationId,
+                'provider' => (string) ($conversation['provider'] ?? 'unknown'),
+                'channel' => (string) ($conversation['channel'] ?? 'Omnicanal'),
+                'payload_json' => json_encode([
+                    'draft_message_id' => $draftId,
+                    'ai_draft' => $draftTrace,
+                    'generated_response_id' => $draftTrace['generated_response_id'] ?? null,
+                    'context_log_id' => $draftTrace['context_log_id'] ?? null,
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+        } catch (\Throwable) {
+            // Trace is useful for training, but it should not block the inbox.
+        }
+    }
+
+    private function latestDraftTrace(int $companyId, int $conversationId): array
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT payload_json FROM omnichannel_events WHERE company_id = :company_id AND conversation_id = :conversation_id AND payload_json LIKE :needle ORDER BY id DESC LIMIT 1');
+            $statement->execute([
+                'company_id' => $companyId,
+                'conversation_id' => $conversationId,
+                'needle' => '%"ai_draft"%',
+            ]);
+            $payload = json_decode((string) $statement->fetchColumn(), true);
+            return is_array($payload) ? $payload : [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function latestGeneratedResponseId(int $companyId, int $conversationId): int
+    {
+        $trace = $this->latestDraftTrace($companyId, $conversationId);
+        if (!empty($trace['generated_response_id'])) {
+            return (int) $trace['generated_response_id'];
+        }
+        if (!empty($trace['ai_draft']['generated_response_id'])) {
+            return (int) $trace['ai_draft']['generated_response_id'];
+        }
+
+        return 0;
+    }
+
+    private function reviewExists(int $companyId, int $messageId): bool
+    {
+        if ($messageId <= 0) {
+            return false;
+        }
+
+        try {
+            $statement = Database::connection()->prepare('SELECT id FROM ai_response_reviews WHERE company_id = :company_id AND message_id = :message_id LIMIT 1');
+            $statement->execute(['company_id' => $companyId, 'message_id' => $messageId]);
+            return (bool) $statement->fetchColumn();
+        } catch (\Throwable) {
+            return false;
         }
     }
 

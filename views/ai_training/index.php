@@ -15,6 +15,7 @@ $knowledgeSources = $overview['knowledgeSources'] ?? [];
 $knowledgeStats = $overview['knowledgeStats'] ?? ['sources' => 0, 'ready' => 0, 'failed' => 0, 'chunks' => 0];
 $knowledgeQuery = $overview['knowledgeQuery'] ?? '';
 $knowledgeResults = $overview['knowledgeResults'] ?? [];
+$responseReviews = $overview['responseReviews'] ?? [];
 $questions = $questions ?? [];
 $answersByKey = $answersByKey ?? [];
 $simulation = $simulation ?? null;
@@ -28,6 +29,7 @@ $tabs = [
     'faqs' => ['Preguntas frecuentes', 'bi-question-circle'],
     'documents' => ['Documentos', 'bi-file-earmark-text'],
     'examples' => ['Ejemplos', 'bi-chat-square-quote'],
+    'corrections' => ['Correcciones', 'bi-pencil-square'],
     'simulator' => ['Simulador', 'bi-stars'],
     'settings' => ['Configuracion', 'bi-sliders'],
     'versions' => ['Versiones', 'bi-clock-history'],
@@ -289,6 +291,39 @@ $progress = (int) ($session['progress_percent'] ?? 0);
                 <?php if (!$examples): ?><p class="task-muted">Aun no hay ejemplos aprobados.</p><?php endif; ?>
             </div>
         </article>
+    </section>
+<?php endif; ?>
+
+<?php if ($section === 'corrections'): ?>
+    <section class="panel mt-4">
+        <div class="panel-title">
+            <div>
+                <span class="eyebrow">Aprendizaje desde Omnicanal</span>
+                <h2>Correcciones y aprobaciones humanas</h2>
+            </div>
+            <span class="soft-badge"><?= e((string) count($responseReviews)) ?> registros</span>
+        </div>
+        <p class="text-secondary">Cada respuesta sugerida por AsisFly que el equipo edita o aprueba queda como senal de entrenamiento para futuras conversaciones de esta empresa.</p>
+        <div class="control-entry-list">
+            <?php foreach ($responseReviews as $review): ?>
+                <div>
+                    <strong><?= e((string) ($review['customer_message'] ?: 'Mensaje de cliente')) ?></strong>
+                    <span>
+                        <?= e((string) ($review['channel'] ?: 'Omnicanal')) ?> /
+                        <?= e((string) ($review['result'] === 'edited' ? 'Editada' : ($review['result'] === 'approved' ? 'Aprobada' : 'Rechazada'))) ?> /
+                        <?= e((string) ($review['reviewer_name'] ?: 'Equipo')) ?>
+                    </span>
+                    <small><?= e((string) ($review['difference_summary'] ?: 'Sin resumen de diferencia.')) ?></small>
+                    <?php if (!empty($review['final_response'])): ?>
+                        <details class="mt-2">
+                            <summary>Ver respuesta final</summary>
+                            <div class="message-body-card mt-2"><?= nl2br(e((string) $review['final_response'])) ?></div>
+                        </details>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+            <?php if (!$responseReviews): ?><p class="task-muted">Aun no hay correcciones. Apareceran cuando edites o apruebes respuestas sugeridas desde el Centro de Supervision.</p><?php endif; ?>
+        </div>
     </section>
 <?php endif; ?>
 

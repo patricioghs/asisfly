@@ -70,6 +70,7 @@ final class AITrainingContextBuilder
             'Preguntas frecuentes' => $this->mapRows($context['faqs'] ?? [], ['question', 'approved_answer']),
             'Documentos relevantes' => $this->mapRows($context['documents'] ?? [], ['title', 'content']),
             'Ejemplos aprobados' => $this->mapRows($context['examples'] ?? [], ['customer_message', 'ideal_response']),
+            'Correcciones humanas recientes' => $this->mapRows($context['reviews'] ?? [], ['customer_message', 'final_response', 'difference_summary']),
         ];
 
         $text = [];
