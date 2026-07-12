@@ -74,6 +74,7 @@ foreach ([
     __DIR__ . '/seeders/014_abilities_compatibility.sql',
     __DIR__ . '/migrations/032_hide_day_notifications_navigation.sql',
     __DIR__ . '/seeders/015_ai_training_seed.sql',
+    __DIR__ . '/migrations/036_simplify_knowledge_navigation.sql',
 ] as $file) {
     $sql = file_get_contents($file);
     if ($sql === false) {

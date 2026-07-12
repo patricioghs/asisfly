@@ -97,11 +97,7 @@ final class AbilityRegistry
             ],
             'Conocimiento' => [
                 ['/ai-training', 'Centro de Entrenamiento IA', 'bi-mortarboard', null],
-                ['/knowledge-base', 'Base de conocimiento', 'bi-book', null],
                 ['/documents', 'Documentos', 'bi-file-earmark', null],
-                ['/catalogs', 'Catalogos', 'bi-folder2-open', null],
-                ['/manuals', 'Manuales', 'bi-journal-text', null],
-                ['/training', 'Entrenamiento', 'bi-mortarboard', null],
             ],
             'Integraciones' => [
                 ['/integrations', 'Integraciones', 'bi-diagram-3', null],
