@@ -17,11 +17,14 @@ final class IntegrationController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $omnichannel = new OmnichannelRepository();
         $this->view('integrations/index', [
             'title' => 'Integraciones',
-            'integrations' => (new TenantRepository())->integrations($this->companyId()),
             'aiSettings' => (new AiProviderRepository())->settings($this->companyId()),
             'canManageAiEngine' => in_array('*', $_SESSION['user']['permissions'] ?? [], true),
+            'accounts' => $omnichannel->accounts($this->companyId()),
+            'accountMetrics' => $omnichannel->accountMetrics($this->companyId()),
+            'whatsappSignup' => (new WhatsAppEmbeddedSignup())->status(),
         ]);
     }
 

@@ -38,7 +38,12 @@ $currentTokenLimit = (string) ($aiSettings['monthly_token_limit'] ?? 500000);
 $currentCostLimit = (string) (float) ($aiSettings['monthly_cost_limit'] ?? 25);
 $keySourceLabels = ['managed' => 'Clave propia de empresa', 'global' => 'Clave global de plataforma', 'env' => 'Respaldo tecnico .env', 'missing' => 'Sin clave'];
 $canManageAiEngine = !empty($canManageAiEngine);
-$accountConnectorProviders = ['gmail', 'outlook', 'whatsapp_business', 'instagram', 'facebook', 'telegram'];
+$accounts = $accounts ?? [];
+$accountMetrics = $accountMetrics ?? [];
+$whatsappSignup = $whatsappSignup ?? ['configured' => false];
+$providerLabels = ['whatsapp_cloud' => 'WhatsApp Business', 'gmail' => 'Gmail', 'outlook' => 'Outlook', 'imap' => 'Correo IMAP/SMTP', 'meta' => 'Meta', 'telegram' => 'Telegram', 'obraok' => 'ObraOK'];
+$statusLabels = ['simulated' => 'Demo', 'sandbox' => 'Prueba', 'connected' => 'Conectada', 'disabled' => 'Pausada', 'error' => 'Error'];
+$channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Instagram' => 'bi-instagram', 'Messenger' => 'bi-messenger', 'Telegram' => 'bi-telegram', 'Operaciones' => 'bi-kanban'];
 ?>
 <?php if (!$canManageAiEngine): ?>
 <section class="panel launch-hero">
@@ -173,22 +178,68 @@ $accountConnectorProviders = ['gmail', 'outlook', 'whatsapp_business', 'instagra
 </section>
 <?php endif; ?>
 
-<div class="row g-3 mt-3">
-    <?php foreach ($integrations as $integration): ?>
-        <?php
-            $provider = (string) ($integration['provider'] ?? '');
-            $targetUrl = in_array($provider, $accountConnectorProviders, true) ? url('/integrations/accounts') : url('/apis');
-            $actionLabel = in_array($provider, $accountConnectorProviders, true) ? 'Conectar cuenta' : 'Ver API';
-        ?>
-        <div class="col-md-6 col-xl-4">
-            <article class="panel integration-card">
-                <div class="d-flex justify-content-between align-items-start">
-                    <h2><?= e($integration['name']) ?></h2>
-                    <span class="badge text-bg-secondary"><?= e($integration['status']) ?></span>
-                </div>
-                <p><?= e($integration['scope']) ?></p>
-                <a class="btn btn-outline-primary btn-sm" href="<?= e($targetUrl) ?>"><?= e($actionLabel) ?></a>
-            </article>
+<section class="panel launch-hero mt-4">
+    <div>
+        <span class="eyebrow">Canales de trabajo</span>
+        <h2>Cuentas conectadas</h2>
+        <p>Conecta WhatsApp, correos, Gmail, Outlook, Instagram, Messenger u otros canales desde un solo lugar. AsisFly usa estas cuentas para recibir mensajes, sugerir respuestas y operar con supervision.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-primary" href="<?= url('/integrations/accounts') ?>"><i class="bi bi-plug"></i> Gestionar cuentas</a>
+        <a class="btn btn-outline-primary" href="<?= url('/integrations/whatsapp/connect') ?>"><i class="bi bi-whatsapp"></i> Conectar WhatsApp</a>
+        <a class="btn btn-outline-secondary" href="<?= url('/inbox') ?>"><i class="bi bi-inboxes"></i> Ver mensajes</a>
+    </div>
+</section>
+
+<?php if (empty($whatsappSignup['configured'])): ?>
+    <section class="panel mt-3">
+        <div class="section-heading mb-0">
+            <div>
+                <span class="eyebrow">WhatsApp Business</span>
+                <h3>Conexion asistida pendiente de configuracion global</h3>
+                <p class="text-secondary mb-0">Cuando el Superadmin configure Meta Embedded Signup, las empresas podran conectar WhatsApp desde el boton sin ingresar datos tecnicos.</p>
+            </div>
+            <span class="status-pill warning"><i class="bi bi-exclamation-triangle"></i> Pendiente</span>
         </div>
+    </section>
+<?php endif; ?>
+
+<section class="crm-metrics mt-4">
+    <?php foreach ($accountMetrics as $metric): ?>
+        <article class="metric-card">
+            <span><?= e((string) $metric['label']) ?></span>
+            <strong><?= e((string) $metric['value']) ?></strong>
+            <small><?= e((string) $metric['hint']) ?></small>
+        </article>
     <?php endforeach; ?>
-</div>
+    <?php if (!$accountMetrics): ?>
+        <article class="metric-card"><span>Cuentas</span><strong>0</strong><small>Sin canales conectados aun</small></article>
+    <?php endif; ?>
+</section>
+
+<section class="panel mt-4">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Resumen operativo</span>
+            <h3>Canales configurados</h3>
+        </div>
+        <a class="btn btn-outline-primary btn-sm" href="<?= url('/integrations/accounts') ?>"><i class="bi bi-sliders"></i> Abrir configuracion</a>
+    </div>
+    <div class="control-entry-list">
+        <?php foreach (array_slice($accounts, 0, 6) as $account): ?>
+            <?php $credential = $account['credential_summary'] ?? []; ?>
+            <div>
+                <strong><i class="bi <?= e($channelIcons[$account['channel']] ?? 'bi-plug') ?>"></i> <?= e((string) $account['display_name']) ?></strong>
+                <span>
+                    <?= e((string) ($providerLabels[$account['provider']] ?? $account['provider'])) ?> /
+                    <?= e((string) ($statusLabels[$account['status']] ?? $account['status'])) ?> /
+                    <?= !empty($credential['is_configured']) ? 'credenciales listas' : 'credenciales pendientes' ?>
+                </span>
+                <small><?= e((string) ($account['external_account_id'] ?: 'Sin identificador publico')) ?></small>
+            </div>
+        <?php endforeach; ?>
+        <?php if (!$accounts): ?>
+            <p class="task-muted">Aun no hay cuentas conectadas. Agrega el primer canal para que AsisFly pueda recibir mensajes y trabajar desde Omnicanal.</p>
+        <?php endif; ?>
+    </div>
+</section>

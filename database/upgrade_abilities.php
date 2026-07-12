@@ -27,6 +27,7 @@ try {
         __DIR__ . '/migrations/035_ai_training_brand_scopes.sql',
         __DIR__ . '/seeders/015_ai_training_seed.sql',
         __DIR__ . '/migrations/036_simplify_knowledge_navigation.sql',
+        __DIR__ . '/migrations/037_simplify_integrations_navigation.sql',
     ] as $file) {
         $sql = file_get_contents($file);
         if ($sql === false) {

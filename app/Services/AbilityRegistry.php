@@ -101,8 +101,6 @@ final class AbilityRegistry
             ],
             'Integraciones' => [
                 ['/integrations', 'Integraciones', 'bi-diagram-3', null],
-                ['/integrations/accounts', 'Cuentas conectadas', 'bi-plug', null],
-                ['/apis', 'APIs', 'bi-code-slash', null],
             ],
             'Empresa' => [
                 ['/company', 'Empresa', 'bi-building', null],
