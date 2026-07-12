@@ -9,4 +9,5 @@ WHERE ability_key = 'core_workspace';
 
 UPDATE marketplace_items
 SET short_description = 'Dashboard y Bandeja de trabajo para operar cada jornada.'
-WHERE ability_key = 'core_workspace';
+WHERE slug = 'core_workspace'
+   OR ability_id IN (SELECT id FROM abilities WHERE ability_key = 'core_workspace');
