@@ -11,26 +11,27 @@ use Throwable;
 
 final class AITrainingRepository
 {
-    public function overview(int $companyId): array
+    public function overview(int $companyId, int $brandRouteId = 0): array
     {
         if (!$this->ready()) {
             return $this->fallback();
         }
 
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
         $session = $this->session($companyId, 0);
-        $profile = $this->profile($companyId);
-        $personality = $this->personality($companyId);
+        $profile = $this->profile($companyId, false, $brandRouteId);
+        $personality = $this->personality($companyId, false, $brandRouteId);
 
         return [
             'session' => $session,
             'profile' => $profile,
             'personality' => $personality,
             'answers' => $this->answers($companyId, (int) ($session['id'] ?? 0)),
-            'metrics' => $this->metrics($companyId),
-            'products' => $this->products($companyId, 8),
-            'rules' => $this->rules($companyId, 8),
-            'faqs' => $this->faqs($companyId, 8),
-            'examples' => $this->examples($companyId, 8),
+            'metrics' => $this->metrics($companyId, $brandRouteId),
+            'products' => $this->products($companyId, 8, $brandRouteId),
+            'rules' => $this->rules($companyId, 8, $brandRouteId),
+            'faqs' => $this->faqs($companyId, 8, $brandRouteId),
+            'examples' => $this->examples($companyId, 8, $brandRouteId),
             'autonomy' => (new AutonomyRepository())->profile($companyId),
             'channels' => $this->channelSettings($companyId),
             'prompt' => $this->activePrompt(),
@@ -40,6 +41,8 @@ final class AITrainingRepository
             'knowledgeResults' => $this->knowledgeResults($companyId, trim((string) ($_GET['knowledge_q'] ?? '')), 8),
             'responseReviews' => $this->responseReviews($companyId, 12),
             'brandRoutes' => $this->brandRoutes($companyId, 20),
+            'selectedBrandRouteId' => $brandRouteId,
+            'selectedBrandRoute' => $brandRouteId > 0 ? $this->brandRoute($companyId, $brandRouteId) : null,
             'routingSettings' => $this->routingSettings($companyId),
         ];
     }
@@ -95,6 +98,34 @@ final class AITrainingRepository
     public function saveProfile(int $companyId, int $userId, array $input): void
     {
         $this->ensureReady();
+        $brandRouteId = $this->validBrandRouteId($companyId, (int) ($input['brand_route_id'] ?? 0));
+
+        if ($brandRouteId > 0 && $this->brandTrainingReady()) {
+            Database::connection()->prepare(
+                'INSERT INTO ai_brand_profiles
+                 (company_id, brand_route_id, status, company_name, description, industry, main_offering, customer_type, value_proposition, differentiators, business_hours, locations, website, contact_details, primary_objective, created_by, updated_by)
+                 VALUES (:company_id, :brand_route_id, :status, :company_name, :description, :industry, :main_offering, :customer_type, :value_proposition, :differentiators, :business_hours, :locations, :website, :contact_details, :primary_objective, :user_id, :user_id)
+                 ON DUPLICATE KEY UPDATE status = VALUES(status), company_name = VALUES(company_name), description = VALUES(description), industry = VALUES(industry), main_offering = VALUES(main_offering), customer_type = VALUES(customer_type), value_proposition = VALUES(value_proposition), differentiators = VALUES(differentiators), business_hours = VALUES(business_hours), locations = VALUES(locations), website = VALUES(website), contact_details = VALUES(contact_details), primary_objective = VALUES(primary_objective), updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP'
+            )->execute([
+                'company_id' => $companyId,
+                'brand_route_id' => $brandRouteId,
+                'status' => $this->status($input['status'] ?? 'draft'),
+                'company_name' => $this->text($input, 'company_name', 180),
+                'description' => $this->text($input, 'description', 5000),
+                'industry' => $this->text($input, 'industry', 160),
+                'main_offering' => $this->text($input, 'main_offering', 5000),
+                'customer_type' => $this->text($input, 'customer_type', 5000),
+                'value_proposition' => $this->text($input, 'value_proposition', 5000),
+                'differentiators' => $this->text($input, 'differentiators', 5000),
+                'business_hours' => $this->text($input, 'business_hours', 220),
+                'locations' => $this->text($input, 'locations', 5000),
+                'website' => $this->text($input, 'website', 220),
+                'contact_details' => $this->text($input, 'contact_details', 5000),
+                'primary_objective' => $this->text($input, 'primary_objective', 220),
+                'user_id' => $userId ?: null,
+            ]);
+            return;
+        }
 
         Database::connection()->prepare(
             'INSERT INTO ai_company_profiles
@@ -120,9 +151,18 @@ final class AITrainingRepository
         ]);
     }
 
-    public function publishProfile(int $companyId, int $userId): void
+    public function publishProfile(int $companyId, int $userId, int $brandRouteId = 0): void
     {
         $this->ensureReady();
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
+
+        if ($brandRouteId > 0 && $this->brandTrainingReady()) {
+            Database::connection()->prepare('UPDATE ai_brand_profiles SET status = "published", published_at = CURRENT_TIMESTAMP, updated_by = :user_id WHERE company_id = :company_id AND brand_route_id = :brand_route_id')
+                ->execute(['company_id' => $companyId, 'brand_route_id' => $brandRouteId, 'user_id' => $userId ?: null]);
+            Database::connection()->prepare('UPDATE ai_brand_personalities SET status = "published", updated_by = :user_id WHERE company_id = :company_id AND brand_route_id = :brand_route_id')
+                ->execute(['company_id' => $companyId, 'brand_route_id' => $brandRouteId, 'user_id' => $userId ?: null]);
+            return;
+        }
 
         Database::connection()->prepare('UPDATE ai_company_profiles SET status = "published", published_at = CURRENT_TIMESTAMP, updated_by = :user_id WHERE company_id = :company_id')
             ->execute(['company_id' => $companyId, 'user_id' => $userId ?: null]);
@@ -135,14 +175,10 @@ final class AITrainingRepository
     public function savePersonality(int $companyId, int $userId, array $input): void
     {
         $this->ensureReady();
-
-        Database::connection()->prepare(
-            'INSERT INTO ai_personalities
-             (company_id, status, tone, allow_emojis, response_length, greeting_style, closing_style, use_customer_name, persuasion_level, primary_language, preferred_phrases, forbidden_phrases, good_examples, bad_examples, created_by, updated_by)
-             VALUES (:company_id, :status, :tone, :allow_emojis, :response_length, :greeting_style, :closing_style, :use_customer_name, :persuasion_level, :primary_language, :preferred_phrases, :forbidden_phrases, :good_examples, :bad_examples, :user_id, :user_id)
-             ON DUPLICATE KEY UPDATE status = VALUES(status), tone = VALUES(tone), allow_emojis = VALUES(allow_emojis), response_length = VALUES(response_length), greeting_style = VALUES(greeting_style), closing_style = VALUES(closing_style), use_customer_name = VALUES(use_customer_name), persuasion_level = VALUES(persuasion_level), primary_language = VALUES(primary_language), preferred_phrases = VALUES(preferred_phrases), forbidden_phrases = VALUES(forbidden_phrases), good_examples = VALUES(good_examples), bad_examples = VALUES(bad_examples), updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP'
-        )->execute([
+        $brandRouteId = $this->validBrandRouteId($companyId, (int) ($input['brand_route_id'] ?? 0));
+        $payload = [
             'company_id' => $companyId,
+            'brand_route_id' => $brandRouteId,
             'status' => $this->status($input['status'] ?? 'draft'),
             'tone' => $this->allowed($input['tone'] ?? 'professional', ['formal', 'professional', 'close', 'technical', 'commercial'], 'professional'),
             'allow_emojis' => !empty($input['allow_emojis']) ? 1 : 0,
@@ -157,6 +193,39 @@ final class AITrainingRepository
             'good_examples' => $this->text($input, 'good_examples', 5000),
             'bad_examples' => $this->text($input, 'bad_examples', 5000),
             'user_id' => $userId ?: null,
+        ];
+
+        if ($brandRouteId > 0 && $this->brandTrainingReady()) {
+            Database::connection()->prepare(
+                'INSERT INTO ai_brand_personalities
+                 (company_id, brand_route_id, status, tone, allow_emojis, response_length, greeting_style, closing_style, use_customer_name, persuasion_level, primary_language, preferred_phrases, forbidden_phrases, good_examples, bad_examples, created_by, updated_by)
+                 VALUES (:company_id, :brand_route_id, :status, :tone, :allow_emojis, :response_length, :greeting_style, :closing_style, :use_customer_name, :persuasion_level, :primary_language, :preferred_phrases, :forbidden_phrases, :good_examples, :bad_examples, :user_id, :user_id)
+                 ON DUPLICATE KEY UPDATE status = VALUES(status), tone = VALUES(tone), allow_emojis = VALUES(allow_emojis), response_length = VALUES(response_length), greeting_style = VALUES(greeting_style), closing_style = VALUES(closing_style), use_customer_name = VALUES(use_customer_name), persuasion_level = VALUES(persuasion_level), primary_language = VALUES(primary_language), preferred_phrases = VALUES(preferred_phrases), forbidden_phrases = VALUES(forbidden_phrases), good_examples = VALUES(good_examples), bad_examples = VALUES(bad_examples), updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP'
+            )->execute($payload);
+            return;
+        }
+
+        Database::connection()->prepare(
+            'INSERT INTO ai_personalities
+             (company_id, status, tone, allow_emojis, response_length, greeting_style, closing_style, use_customer_name, persuasion_level, primary_language, preferred_phrases, forbidden_phrases, good_examples, bad_examples, created_by, updated_by)
+             VALUES (:company_id, :status, :tone, :allow_emojis, :response_length, :greeting_style, :closing_style, :use_customer_name, :persuasion_level, :primary_language, :preferred_phrases, :forbidden_phrases, :good_examples, :bad_examples, :user_id, :user_id)
+             ON DUPLICATE KEY UPDATE status = VALUES(status), tone = VALUES(tone), allow_emojis = VALUES(allow_emojis), response_length = VALUES(response_length), greeting_style = VALUES(greeting_style), closing_style = VALUES(closing_style), use_customer_name = VALUES(use_customer_name), persuasion_level = VALUES(persuasion_level), primary_language = VALUES(primary_language), preferred_phrases = VALUES(preferred_phrases), forbidden_phrases = VALUES(forbidden_phrases), good_examples = VALUES(good_examples), bad_examples = VALUES(bad_examples), updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP'
+        )->execute([
+            'company_id' => $companyId,
+            'status' => $payload['status'],
+            'tone' => $payload['tone'],
+            'allow_emojis' => $payload['allow_emojis'],
+            'response_length' => $payload['response_length'],
+            'greeting_style' => $payload['greeting_style'],
+            'closing_style' => $payload['closing_style'],
+            'use_customer_name' => $payload['use_customer_name'],
+            'persuasion_level' => $payload['persuasion_level'],
+            'primary_language' => $payload['primary_language'],
+            'preferred_phrases' => $payload['preferred_phrases'],
+            'forbidden_phrases' => $payload['forbidden_phrases'],
+            'good_examples' => $payload['good_examples'],
+            'bad_examples' => $payload['bad_examples'],
+            'user_id' => $payload['user_id'],
         ]);
     }
 
@@ -167,7 +236,8 @@ final class AITrainingRepository
             throw new RuntimeException('El nombre del producto o servicio es obligatorio.');
         }
 
-        Database::connection()->prepare(
+        $pdo = Database::connection();
+        $pdo->prepare(
             'INSERT INTO ai_products (company_id, item_type, name, category, description, price_type, price_from, price_to, currency, delivery_time, requirements, stock, warranty, restrictions, faqs, status, created_by, updated_by)
              VALUES (:company_id, :item_type, :name, :category, :description, :price_type, :price_from, :price_to, :currency, :delivery_time, :requirements, :stock, :warranty, :restrictions, :faqs, :status, :user_id, :user_id)'
         )->execute([
@@ -189,6 +259,7 @@ final class AITrainingRepository
             'status' => $this->allowed($input['status'] ?? 'active', ['active', 'inactive'], 'active'),
             'user_id' => $userId ?: null,
         ]);
+        $this->assignBrandScope($companyId, (int) ($input['brand_route_id'] ?? 0), 'product', (int) $pdo->lastInsertId());
     }
 
     public function addRule(int $companyId, int $userId, array $input): void
@@ -198,7 +269,8 @@ final class AITrainingRepository
             throw new RuntimeException('El nombre de la regla es obligatorio.');
         }
 
-        Database::connection()->prepare(
+        $pdo = Database::connection();
+        $pdo->prepare(
             'INSERT INTO ai_business_rules (company_id, name, description, condition_text, action_text, priority, channel, escalation_role, effective_until, status, is_active, created_by, updated_by)
              VALUES (:company_id, :name, :description, :condition_text, :action_text, :priority, :channel, :escalation_role, :effective_until, :status, :is_active, :user_id, :user_id)'
         )->execute([
@@ -215,6 +287,7 @@ final class AITrainingRepository
             'is_active' => !empty($input['is_active']) ? 1 : 0,
             'user_id' => $userId ?: null,
         ]);
+        $this->assignBrandScope($companyId, (int) ($input['brand_route_id'] ?? 0), 'rule', (int) $pdo->lastInsertId());
     }
 
     public function addFaq(int $companyId, int $userId, array $input): void
@@ -225,7 +298,8 @@ final class AITrainingRepository
         }
 
         $status = $this->status($input['status'] ?? 'published');
-        Database::connection()->prepare(
+        $pdo = Database::connection();
+        $pdo->prepare(
             'INSERT INTO ai_faqs (company_id, question, variants, approved_answer, category, tags, channel, priority, source, status, created_by, approved_by, approved_at)
              VALUES (:company_id, :question, :variants, :approved_answer, :category, :tags, :channel, :priority, :source, :status, :created_by, :approved_by, :approved_at)'
         )->execute([
@@ -243,6 +317,7 @@ final class AITrainingRepository
             'approved_by' => $status === 'published' ? ($userId ?: null) : null,
             'approved_at' => $status === 'published' ? date('Y-m-d H:i:s') : null,
         ]);
+        $this->assignBrandScope($companyId, (int) ($input['brand_route_id'] ?? 0), 'faq', (int) $pdo->lastInsertId());
     }
 
     public function addExample(int $companyId, int $userId, array $input): void
@@ -253,7 +328,8 @@ final class AITrainingRepository
         }
 
         $status = $this->status($input['status'] ?? 'published');
-        Database::connection()->prepare(
+        $pdo = Database::connection();
+        $pdo->prepare(
             'INSERT INTO ai_conversation_examples (company_id, customer_message, ideal_response, channel, category, intent, tags, product_service, expected_result, status, approved_by, approved_at, created_by)
              VALUES (:company_id, :customer_message, :ideal_response, :channel, :category, :intent, :tags, :product_service, :expected_result, :status, :approved_by, :approved_at, :created_by)'
         )->execute([
@@ -271,6 +347,7 @@ final class AITrainingRepository
             'approved_at' => $status === 'published' ? date('Y-m-d H:i:s') : null,
             'created_by' => $userId ?: null,
         ]);
+        $this->assignBrandScope($companyId, (int) ($input['brand_route_id'] ?? 0), 'example', (int) $pdo->lastInsertId());
     }
 
     public function saveChannelSetting(int $companyId, array $input): void
@@ -487,20 +564,20 @@ final class AITrainingRepository
             ]);
     }
 
-    private function metrics(int $companyId): array
+    private function metrics(int $companyId, int $brandRouteId = 0): array
     {
         $session = $this->session($companyId, 0);
         $answers = $this->scalar('SELECT COUNT(*) FROM ai_onboarding_answers WHERE company_id = :company_id AND session_id = :session_id AND answer IS NOT NULL AND answer <> ""', ['company_id' => $companyId, 'session_id' => (int) $session['id']]);
-        $products = $this->scalar('SELECT COUNT(*) FROM ai_products WHERE company_id = :company_id AND status = "active"', ['company_id' => $companyId]);
-        $rules = $this->scalar('SELECT COUNT(*) FROM ai_business_rules WHERE company_id = :company_id AND status = "published" AND is_active = TRUE', ['company_id' => $companyId]);
-        $faqs = $this->scalar('SELECT COUNT(*) FROM ai_faqs WHERE company_id = :company_id AND status = "published"', ['company_id' => $companyId]);
-        $examples = $this->scalar('SELECT COUNT(*) FROM ai_conversation_examples WHERE company_id = :company_id AND status = "published"', ['company_id' => $companyId]);
+        $products = $this->scopedCount('ai_products', 'product', $companyId, $brandRouteId, 'status = "active"');
+        $rules = $this->scopedCount('ai_business_rules', 'rule', $companyId, $brandRouteId, 'status = "published" AND is_active = TRUE');
+        $faqs = $this->scopedCount('ai_faqs', 'faq', $companyId, $brandRouteId, 'status = "published"');
+        $examples = $this->scopedCount('ai_conversation_examples', 'example', $companyId, $brandRouteId, 'status = "published"');
         $reviews = $this->reviewMetrics($companyId);
         $documents = $this->documentMetrics($companyId);
         $readinessItems = [
-            !empty($this->profile($companyId)['description']),
+            !empty($this->profile($companyId, false, $brandRouteId)['description']),
             $products > 0,
-            !empty($this->personality($companyId)['primary_language']),
+            !empty($this->personality($companyId, false, $brandRouteId)['primary_language']),
             $rules > 0,
             $faqs > 0,
             $examples > 0,
@@ -530,8 +607,32 @@ final class AITrainingRepository
         return $statement->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    private function profile(int $companyId, bool $publishedOnly = false): array
+    private function profile(int $companyId, bool $publishedOnly = false, int $brandRouteId = 0): array
     {
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
+        if ($brandRouteId > 0 && $this->brandTrainingReady()) {
+            $where = 'company_id = :company_id AND brand_route_id = :brand_route_id';
+            if ($publishedOnly) {
+                $where .= ' AND status = "published"';
+            }
+            $statement = Database::connection()->prepare("SELECT * FROM ai_brand_profiles WHERE {$where} LIMIT 1");
+            $statement->execute(['company_id' => $companyId, 'brand_route_id' => $brandRouteId]);
+            $row = $statement->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                return $row;
+            }
+
+            $route = $this->brandRoute($companyId, $brandRouteId);
+            return [
+                'company_id' => $companyId,
+                'brand_route_id' => $brandRouteId,
+                'status' => 'draft',
+                'company_name' => $route['target_company_name'] ?? $route['brand_name'] ?? '',
+                'description' => $route['description'] ?? '',
+                'main_offering' => $route['products_services'] ?? '',
+            ];
+        }
+
         $where = 'company_id = :company_id';
         if ($publishedOnly) {
             $where .= ' AND status = "published"';
@@ -541,8 +642,27 @@ final class AITrainingRepository
         return $statement->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
-    private function personality(int $companyId, bool $publishedOnly = false): array
+    private function personality(int $companyId, bool $publishedOnly = false, int $brandRouteId = 0): array
     {
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
+        if ($brandRouteId > 0 && $this->brandTrainingReady()) {
+            $where = 'company_id = :company_id AND brand_route_id = :brand_route_id';
+            if ($publishedOnly) {
+                $where .= ' AND status = "published"';
+            }
+            $statement = Database::connection()->prepare("SELECT * FROM ai_brand_personalities WHERE {$where} LIMIT 1");
+            $statement->execute(['company_id' => $companyId, 'brand_route_id' => $brandRouteId]);
+            $row = $statement->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                return $row;
+            }
+
+            $base = $this->personality($companyId, false, 0);
+            $base['brand_route_id'] = $brandRouteId;
+            $base['status'] = $base['status'] ?? 'draft';
+            return $base;
+        }
+
         $where = 'company_id = :company_id';
         if ($publishedOnly) {
             $where .= ' AND status = "published"';
@@ -552,24 +672,24 @@ final class AITrainingRepository
         return $statement->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 
-    private function products(int $companyId, int $limit): array
+    private function products(int $companyId, int $limit, int $brandRouteId = 0): array
     {
-        return $this->rows('SELECT * FROM ai_products WHERE company_id = :company_id ORDER BY FIELD(status, "active", "inactive"), id DESC LIMIT ' . max(1, $limit), ['company_id' => $companyId]);
+        return $this->scopedRows('ai_products', 'product', $companyId, $brandRouteId, 'FIELD(status, "active", "inactive"), id DESC', $limit);
     }
 
-    private function rules(int $companyId, int $limit): array
+    private function rules(int $companyId, int $limit, int $brandRouteId = 0): array
     {
-        return $this->rows('SELECT * FROM ai_business_rules WHERE company_id = :company_id ORDER BY FIELD(priority, "critical", "high", "medium", "low"), id DESC LIMIT ' . max(1, $limit), ['company_id' => $companyId]);
+        return $this->scopedRows('ai_business_rules', 'rule', $companyId, $brandRouteId, 'FIELD(priority, "critical", "high", "medium", "low"), id DESC', $limit);
     }
 
-    private function faqs(int $companyId, int $limit): array
+    private function faqs(int $companyId, int $limit, int $brandRouteId = 0): array
     {
-        return $this->rows('SELECT * FROM ai_faqs WHERE company_id = :company_id ORDER BY FIELD(priority, "critical", "high", "medium", "low"), id DESC LIMIT ' . max(1, $limit), ['company_id' => $companyId]);
+        return $this->scopedRows('ai_faqs', 'faq', $companyId, $brandRouteId, 'FIELD(priority, "critical", "high", "medium", "low"), id DESC', $limit);
     }
 
-    private function examples(int $companyId, int $limit): array
+    private function examples(int $companyId, int $limit, int $brandRouteId = 0): array
     {
-        return $this->rows('SELECT * FROM ai_conversation_examples WHERE company_id = :company_id ORDER BY id DESC LIMIT ' . max(1, $limit), ['company_id' => $companyId]);
+        return $this->scopedRows('ai_conversation_examples', 'example', $companyId, $brandRouteId, 'id DESC', $limit);
     }
 
     private function channelSettings(int $companyId): array
@@ -584,6 +704,18 @@ final class AITrainingRepository
         }
 
         return $this->rows('SELECT * FROM ai_brand_routes WHERE company_id = :company_id ORDER BY FIELD(status, "active", "inactive"), priority DESC, id DESC LIMIT ' . max(1, min(50, $limit)), ['company_id' => $companyId]);
+    }
+
+    private function brandRoute(int $companyId, int $brandRouteId): ?array
+    {
+        if (!$this->routingReady() || $brandRouteId <= 0) {
+            return null;
+        }
+
+        $statement = Database::connection()->prepare('SELECT * FROM ai_brand_routes WHERE company_id = :company_id AND id = :id LIMIT 1');
+        $statement->execute(['company_id' => $companyId, 'id' => $brandRouteId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
     private function routingSettings(int $companyId): array
@@ -703,6 +835,80 @@ final class AITrainingRepository
         return $statement->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    private function scopedRows(string $table, string $entityType, int $companyId, int $brandRouteId, string $order, int $limit): array
+    {
+        $limit = max(1, $limit);
+        if (!$this->brandTrainingReady()) {
+            return $this->rows("SELECT * FROM {$table} WHERE company_id = :company_id ORDER BY {$order} LIMIT {$limit}", ['company_id' => $companyId]);
+        }
+
+        if ($brandRouteId > 0) {
+            return $this->rows(
+                "SELECT t.*
+                 FROM {$table} t
+                 INNER JOIN ai_training_brand_scopes s
+                    ON s.company_id = t.company_id
+                   AND s.entity_id = t.id
+                   AND s.entity_type = :entity_type
+                   AND s.brand_route_id = :brand_route_id
+                 WHERE t.company_id = :company_id
+                 ORDER BY {$order}
+                 LIMIT {$limit}",
+                ['company_id' => $companyId, 'entity_type' => $entityType, 'brand_route_id' => $brandRouteId]
+            );
+        }
+
+        return $this->rows(
+            "SELECT t.*
+             FROM {$table} t
+             WHERE t.company_id = :company_id
+               AND NOT EXISTS (
+                   SELECT 1 FROM ai_training_brand_scopes s
+                   WHERE s.company_id = t.company_id
+                     AND s.entity_type = :entity_type
+                     AND s.entity_id = t.id
+               )
+             ORDER BY {$order}
+             LIMIT {$limit}",
+            ['company_id' => $companyId, 'entity_type' => $entityType]
+        );
+    }
+
+    private function scopedCount(string $table, string $entityType, int $companyId, int $brandRouteId, string $condition): int
+    {
+        if (!$this->brandTrainingReady()) {
+            return $this->scalar("SELECT COUNT(*) FROM {$table} WHERE company_id = :company_id AND {$condition}", ['company_id' => $companyId]);
+        }
+
+        if ($brandRouteId > 0) {
+            return $this->scalar(
+                "SELECT COUNT(*)
+                 FROM {$table} t
+                 INNER JOIN ai_training_brand_scopes s
+                    ON s.company_id = t.company_id
+                   AND s.entity_id = t.id
+                   AND s.entity_type = :entity_type
+                   AND s.brand_route_id = :brand_route_id
+                 WHERE t.company_id = :company_id AND {$condition}",
+                ['company_id' => $companyId, 'entity_type' => $entityType, 'brand_route_id' => $brandRouteId]
+            );
+        }
+
+        return $this->scalar(
+            "SELECT COUNT(*)
+             FROM {$table} t
+             WHERE t.company_id = :company_id
+               AND {$condition}
+               AND NOT EXISTS (
+                   SELECT 1 FROM ai_training_brand_scopes s
+                   WHERE s.company_id = t.company_id
+                     AND s.entity_type = :entity_type
+                     AND s.entity_id = t.id
+               )",
+            ['company_id' => $companyId, 'entity_type' => $entityType]
+        );
+    }
+
     private function scalar(string $sql, array $params): int
     {
         $statement = Database::connection()->prepare($sql);
@@ -713,6 +919,33 @@ final class AITrainingRepository
     private function brandRouteBelongsToCompany(int $companyId, int $brandRouteId): bool
     {
         return $this->scalar('SELECT COUNT(*) FROM ai_brand_routes WHERE company_id = :company_id AND id = :id', ['company_id' => $companyId, 'id' => $brandRouteId]) > 0;
+    }
+
+    private function validBrandRouteId(int $companyId, int $brandRouteId): int
+    {
+        if (!$this->routingReady()) {
+            return 0;
+        }
+
+        return $brandRouteId > 0 && $this->brandRouteBelongsToCompany($companyId, $brandRouteId) ? $brandRouteId : 0;
+    }
+
+    private function assignBrandScope(int $companyId, int $brandRouteId, string $entityType, int $entityId): void
+    {
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
+        if ($brandRouteId <= 0 || $entityId <= 0 || !$this->brandTrainingReady()) {
+            return;
+        }
+
+        Database::connection()->prepare(
+            'INSERT IGNORE INTO ai_training_brand_scopes (company_id, brand_route_id, entity_type, entity_id)
+             VALUES (:company_id, :brand_route_id, :entity_type, :entity_id)'
+        )->execute([
+            'company_id' => $companyId,
+            'brand_route_id' => $brandRouteId,
+            'entity_type' => $entityType,
+            'entity_id' => $entityId,
+        ]);
     }
 
     private function ready(): bool
@@ -749,6 +982,18 @@ final class AITrainingRepository
     {
         if (!$this->routingReady()) {
             throw new RuntimeException('La migracion de marcas y enrutamiento no esta instalada.');
+        }
+    }
+
+    private function brandTrainingReady(): bool
+    {
+        try {
+            Database::connection()->query('SELECT 1 FROM ai_brand_profiles LIMIT 1');
+            Database::connection()->query('SELECT 1 FROM ai_brand_personalities LIMIT 1');
+            Database::connection()->query('SELECT 1 FROM ai_training_brand_scopes LIMIT 1');
+            return true;
+        } catch (Throwable) {
+            return false;
         }
     }
 

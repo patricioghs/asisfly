@@ -92,7 +92,7 @@ final class AITrainingController extends Controller
     {
         $this->requireTrainingAccess('ai_training.view');
         $repo = new AITrainingRepository();
-        $overview = $repo->overview($this->companyId());
+        $overview = $repo->overview($this->companyId(), $this->selectedBrandRouteId());
         $questions = $repo->questions();
         $answersByKey = [];
         foreach ($overview['answers'] ?? [] as $answer) {
@@ -133,14 +133,14 @@ final class AITrainingController extends Controller
         $answer = trim((string) ($_POST['answer'] ?? ''));
         if ($questionKey === '') {
             $_SESSION['flash_error'] = 'No se pudo identificar la pregunta de entrenamiento.';
-            $this->redirect('/ai-training?section=onboarding');
+            $this->redirect($this->sectionUrl('onboarding'));
         }
 
         $this->runTrainingAction(
             fn (): mixed => (new AITrainingRepository())->saveOnboardingAnswer($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $questionKey, $answer),
             'Respuesta guardada. Puedes continuar cuando quieras.'
         );
-        $this->redirect('/ai-training?section=onboarding#question-' . rawurlencode($questionKey));
+        $this->redirect($this->sectionUrl('onboarding') . '#question-' . rawurlencode($questionKey));
     }
 
     public function saveProfile(): void
@@ -150,7 +150,7 @@ final class AITrainingController extends Controller
             fn (): mixed => (new AITrainingRepository())->saveProfile($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $_POST),
             'Perfil de empresa actualizado.'
         );
-        $this->redirect('/ai-training?section=company');
+        $this->redirect($this->sectionUrl('company', (int) ($_POST['brand_route_id'] ?? 0)));
     }
 
     public function savePersonality(): void
@@ -160,7 +160,7 @@ final class AITrainingController extends Controller
             fn (): mixed => (new AITrainingRepository())->savePersonality($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $_POST),
             'Personalidad del trabajador virtual actualizada.'
         );
-        $this->redirect('/ai-training?section=personality');
+        $this->redirect($this->sectionUrl('personality', (int) ($_POST['brand_route_id'] ?? 0)));
     }
 
     public function addProduct(): void
@@ -168,13 +168,13 @@ final class AITrainingController extends Controller
         $this->requireTrainingAccess('ai_training.edit');
         if (trim((string) ($_POST['name'] ?? '')) === '') {
             $_SESSION['flash_error'] = 'Ingresa el nombre del producto o servicio.';
-            $this->redirect('/ai-training?section=products');
+            $this->redirect($this->sectionUrl('products', (int) ($_POST['brand_route_id'] ?? 0)));
         }
         $this->runTrainingAction(
             fn (): mixed => (new AITrainingRepository())->addProduct($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $_POST),
             'Producto o servicio agregado al conocimiento.'
         );
-        $this->redirect('/ai-training?section=products');
+        $this->redirect($this->sectionUrl('products', (int) ($_POST['brand_route_id'] ?? 0)));
     }
 
     public function addRule(): void
@@ -182,13 +182,13 @@ final class AITrainingController extends Controller
         $this->requireTrainingAccess('ai_training.rules.manage');
         if (trim((string) ($_POST['name'] ?? '')) === '') {
             $_SESSION['flash_error'] = 'Ingresa el nombre de la regla.';
-            $this->redirect('/ai-training?section=rules');
+            $this->redirect($this->sectionUrl('rules', (int) ($_POST['brand_route_id'] ?? 0)));
         }
         $this->runTrainingAction(
             fn (): mixed => (new AITrainingRepository())->addRule($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $_POST),
             'Regla de negocio agregada.'
         );
-        $this->redirect('/ai-training?section=rules');
+        $this->redirect($this->sectionUrl('rules', (int) ($_POST['brand_route_id'] ?? 0)));
     }
 
     public function addFaq(): void
@@ -196,13 +196,13 @@ final class AITrainingController extends Controller
         $this->requireTrainingAccess('ai_training.edit');
         if (trim((string) ($_POST['question'] ?? '')) === '' || trim((string) ($_POST['approved_answer'] ?? '')) === '') {
             $_SESSION['flash_error'] = 'Ingresa la pregunta y la respuesta aprobada.';
-            $this->redirect('/ai-training?section=faqs');
+            $this->redirect($this->sectionUrl('faqs', (int) ($_POST['brand_route_id'] ?? 0)));
         }
         $this->runTrainingAction(
             fn (): mixed => (new AITrainingRepository())->addFaq($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $_POST),
             'Pregunta frecuente guardada.'
         );
-        $this->redirect('/ai-training?section=faqs');
+        $this->redirect($this->sectionUrl('faqs', (int) ($_POST['brand_route_id'] ?? 0)));
     }
 
     public function addExample(): void
@@ -210,13 +210,13 @@ final class AITrainingController extends Controller
         $this->requireTrainingAccess('ai_training.examples.manage');
         if (trim((string) ($_POST['customer_message'] ?? '')) === '' || trim((string) ($_POST['ideal_response'] ?? '')) === '') {
             $_SESSION['flash_error'] = 'Ingresa el mensaje del cliente y la respuesta ideal.';
-            $this->redirect('/ai-training?section=examples');
+            $this->redirect($this->sectionUrl('examples', (int) ($_POST['brand_route_id'] ?? 0)));
         }
         $this->runTrainingAction(
             fn (): mixed => (new AITrainingRepository())->addExample($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $_POST),
             'Ejemplo aprobado guardado.'
         );
-        $this->redirect('/ai-training?section=examples');
+        $this->redirect($this->sectionUrl('examples', (int) ($_POST['brand_route_id'] ?? 0)));
     }
 
     public function saveChannel(): void
@@ -259,7 +259,7 @@ final class AITrainingController extends Controller
         $this->requireTrainingAccess('ai_training.documents.manage');
         if (empty($_FILES['document']['name'])) {
             $_SESSION['flash_error'] = 'Selecciona un documento para entrenar a AsisFly.';
-            $this->redirect('/ai-training?section=documents');
+            $this->redirect($this->sectionUrl('documents', (int) ($_POST['brand_route_id'] ?? 0)));
         }
 
         try {
@@ -276,7 +276,7 @@ final class AITrainingController extends Controller
         } catch (Throwable $exception) {
             $_SESSION['flash_error'] = 'No se pudo procesar el documento: ' . $exception->getMessage();
         }
-        $this->redirect('/ai-training?section=documents');
+        $this->redirect($this->sectionUrl('documents', (int) ($_POST['brand_route_id'] ?? 0)));
     }
 
     public function reprocessDocument(): void
@@ -298,7 +298,7 @@ final class AITrainingController extends Controller
         $message = trim((string) ($_POST['customer_message'] ?? ''));
         if ($message === '') {
             $_SESSION['flash_error'] = 'Escribe un mensaje de cliente para practicar.';
-            $this->redirect('/ai-training?section=simulator');
+            $this->redirect($this->sectionUrl('simulator', (int) ($_POST['brand_route_id'] ?? 0)));
         }
 
         try {
@@ -306,17 +306,32 @@ final class AITrainingController extends Controller
         } catch (Throwable $exception) {
             $_SESSION['flash_error'] = 'No se pudo generar la simulacion: ' . $exception->getMessage();
         }
-        $this->redirect('/ai-training?section=simulator');
+        $this->redirect($this->sectionUrl('simulator', (int) ($_POST['brand_route_id'] ?? 0)));
     }
 
     public function publish(): void
     {
         $this->requireTrainingAccess('ai_training.publish');
         $this->runTrainingAction(
-            fn (): mixed => (new AITrainingRepository())->publishProfile($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0)),
+            fn (): mixed => (new AITrainingRepository())->publishProfile($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), (int) ($_POST['brand_route_id'] ?? 0)),
             'Conocimiento principal publicado. AsisFly ya puede usar esta version como contexto autorizado.'
         );
-        $this->redirect('/ai-training?section=summary');
+        $this->redirect($this->sectionUrl('summary', (int) ($_POST['brand_route_id'] ?? 0)));
+    }
+
+    private function selectedBrandRouteId(): int
+    {
+        return max(0, (int) ($_GET['brand_route_id'] ?? $_POST['brand_route_id'] ?? 0));
+    }
+
+    private function sectionUrl(string $section, int $brandRouteId = 0): string
+    {
+        $query = ['section' => $section];
+        if ($brandRouteId > 0) {
+            $query['brand_route_id'] = $brandRouteId;
+        }
+
+        return '/ai-training?' . http_build_query($query);
     }
 
     private function runTrainingAction(callable $action, string $successMessage): void

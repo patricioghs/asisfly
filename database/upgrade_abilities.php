@@ -24,6 +24,7 @@ try {
         __DIR__ . '/migrations/032_hide_day_notifications_navigation.sql',
         __DIR__ . '/migrations/033_ai_brand_routing_schema.sql',
         __DIR__ . '/migrations/034_ai_brand_route_detections.sql',
+        __DIR__ . '/migrations/035_ai_training_brand_scopes.sql',
         __DIR__ . '/seeders/015_ai_training_seed.sql',
     ] as $file) {
         $sql = file_get_contents($file);

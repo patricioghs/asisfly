@@ -32,6 +32,8 @@ $knowledgeQuery = $overview['knowledgeQuery'] ?? '';
 $knowledgeResults = $overview['knowledgeResults'] ?? [];
 $responseReviews = $overview['responseReviews'] ?? [];
 $brandRoutes = $overview['brandRoutes'] ?? [];
+$selectedBrandRouteId = (int) ($overview['selectedBrandRouteId'] ?? ($_GET['brand_route_id'] ?? 0));
+$selectedBrandRoute = $overview['selectedBrandRoute'] ?? null;
 $routingSettings = $overview['routingSettings'] ?? [
     'shared_channels' => 'WhatsApp principal',
     'ambiguous_action' => 'ask_customer',
@@ -62,7 +64,16 @@ if (!isset($tabs[$section])) {
     $section = 'summary';
 }
 $activeTab = $tabs[$section];
-$trainingSectionUrl = static fn (string $key): string => url('/ai-training?section=' . $key) . '#training-content';
+$scopedSections = ['summary', 'company', 'products', 'personality', 'rules', 'faqs', 'examples', 'documents', 'simulator'];
+$trainingSectionUrl = static function (string $key, ?int $brandRouteId = null) use (&$selectedBrandRouteId): string {
+    $query = ['section' => $key];
+    $targetBrandRouteId = $brandRouteId ?? $selectedBrandRouteId;
+    if ($targetBrandRouteId > 0) {
+        $query['brand_route_id'] = $targetBrandRouteId;
+    }
+    return url('/ai-training?' . http_build_query($query)) . '#training-content';
+};
+$scopeLabel = $selectedBrandRouteId > 0 ? (string) ($selectedBrandRoute['brand_name'] ?? 'Marca seleccionada') : 'General';
 $statusLabels = ['draft' => 'Borrador', 'review' => 'En revision', 'published' => 'Publicado', 'archived' => 'Archivado'];
 $toneLabels = ['formal' => 'Formal', 'professional' => 'Profesional', 'close' => 'Cercano', 'technical' => 'Tecnico', 'commercial' => 'Comercial'];
 $lengthLabels = ['short' => 'Breve', 'medium' => 'Media', 'detailed' => 'Detallada'];
@@ -96,12 +107,29 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     <?php endforeach; ?>
 </nav>
 
+<?php if (in_array($section, $scopedSections, true)): ?>
+    <nav class="panel controls-filter-bar ai-training-tabs mt-3" aria-label="Alcance del entrenamiento">
+        <span class="soft-badge"><i class="bi bi-diagram-3"></i> Entrenando: <?= e($scopeLabel) ?></span>
+        <a class="btn <?= $selectedBrandRouteId === 0 ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= e($trainingSectionUrl($section, 0)) ?>">
+            <i class="bi bi-layers"></i>General
+        </a>
+        <?php foreach ($brandRoutes as $route): ?>
+            <a class="btn <?= $selectedBrandRouteId === (int) $route['id'] ? 'btn-primary' : 'btn-outline-secondary' ?>" href="<?= e($trainingSectionUrl($section, (int) $route['id'])) ?>">
+                <i class="bi bi-building-check"></i><?= e((string) $route['brand_name']) ?>
+            </a>
+        <?php endforeach; ?>
+        <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('routing', 0)) ?>">
+            <i class="bi bi-plus-lg"></i>Agregar empresa/marca
+        </a>
+    </nav>
+<?php endif; ?>
+
 <section id="training-content" class="panel ai-training-active-section mt-4" tabindex="-1">
     <div>
         <span class="eyebrow">Seccion activa</span>
         <h2><i class="bi <?= e($activeTab[1]) ?>"></i><?= e($activeTab[0]) ?></h2>
     </div>
-    <small>Completa esta parte para que AsisFly aprenda como vender, responder y operar en tu empresa.</small>
+    <small>Completa esta parte para que AsisFly aprenda como vender, responder y operar en <?= e($scopeLabel) ?>.</small>
 </section>
 
 <?php if ($section === 'summary'): ?>
@@ -149,6 +177,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
             <p>Publicar marca el perfil y personalidad como conocimiento autorizado. Las reglas, FAQs y ejemplos deben estar en estado Publicado para entrar al contexto.</p>
             <form method="post" action="<?= url('/ai-training/publish') ?>">
                 <?= csrf_field() ?>
+                <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
                 <button class="btn btn-primary"><i class="bi bi-check2-circle"></i>Confirmar y publicar</button>
             </form>
         </article>
@@ -187,6 +216,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
 <?php if ($section === 'company'): ?>
     <form class="panel mt-4 control-entry-form" method="post" action="<?= url('/ai-training/profile') ?>">
         <?= csrf_field() ?>
+        <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
         <div class="panel-title"><div><span class="eyebrow">Empresa</span><h2>Perfil del trabajador virtual</h2></div></div>
         <div class="controls-detail-grid">
             <input class="form-control" name="company_name" value="<?= e((string) ($profile['company_name'] ?? ($company['name'] ?? ''))) ?>" placeholder="Nombre de empresa">
@@ -213,6 +243,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     <section class="controls-detail-grid mt-4">
         <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/product') ?>">
             <?= csrf_field() ?>
+            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">Catalogo IA</span><h2>Agregar producto o servicio</h2></div></div>
             <input class="form-control" name="name" placeholder="Nombre" required>
             <div class="control-create-grid">
@@ -248,6 +279,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
 <?php if ($section === 'personality'): ?>
     <form class="panel mt-4 control-entry-form" method="post" action="<?= url('/ai-training/personality') ?>">
         <?= csrf_field() ?>
+        <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
         <div class="panel-title"><div><span class="eyebrow">Personalidad</span><h2>Como debe hablar AsisFly</h2></div></div>
         <div class="controls-detail-grid">
             <select class="form-select" name="tone"><?php foreach ($toneLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= ($personality['tone'] ?? 'professional') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select>
@@ -272,6 +304,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     <section class="controls-detail-grid mt-4">
         <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/rule') ?>">
             <?= csrf_field() ?>
+            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">Regla operativa</span><h2>Nueva regla</h2></div></div>
             <input class="form-control" name="name" placeholder="Ej: No ofrecer descuentos sin autorizacion" required>
             <textarea class="form-control" name="description" rows="2" placeholder="Descripcion"></textarea>
@@ -303,6 +336,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     <section class="controls-detail-grid mt-4">
         <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/faq') ?>">
             <?= csrf_field() ?>
+            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">FAQ aprobada</span><h2>Nueva pregunta frecuente</h2></div></div>
             <textarea class="form-control" name="question" rows="2" placeholder="Pregunta" required></textarea>
             <textarea class="form-control" name="variants" rows="2" placeholder="Variantes de la pregunta"></textarea>
@@ -328,6 +362,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     <section class="controls-detail-grid mt-4">
         <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/example') ?>">
             <?= csrf_field() ?>
+            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">Ejemplo aprobado</span><h2>Como deberia responder</h2></div></div>
             <textarea class="form-control" name="customer_message" rows="4" placeholder="Mensaje del cliente" required></textarea>
             <textarea class="form-control" name="ideal_response" rows="5" placeholder="Respuesta ideal" required></textarea>
@@ -393,6 +428,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     <section class="controls-detail-grid mt-4">
         <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/document') ?>" enctype="multipart/form-data">
             <?= csrf_field() ?>
+            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">Fuente documental</span><h2>Subir documento</h2></div></div>
             <input class="form-control" type="file" name="document" accept=".pdf,.docx,.xlsx,.csv,.txt" required>
             <div class="control-create-grid">
@@ -405,6 +441,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
 
         <form class="panel control-entry-form" method="get" action="<?= url('/ai-training') ?>">
             <input type="hidden" name="section" value="documents">
+            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">Recuperacion</span><h2>Buscar conocimiento</h2></div></div>
             <input class="form-control" name="knowledge_q" value="<?= e((string) $knowledgeQuery) ?>" placeholder="Ej: garantia, despacho, precios, condiciones">
             <button class="btn btn-outline-primary"><i class="bi bi-search"></i>Buscar fragmentos</button>
@@ -457,6 +494,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     <section class="controls-detail-grid mt-4">
         <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/simulate') ?>">
             <?= csrf_field() ?>
+            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">Practicar</span><h2>Mensaje ficticio de cliente</h2></div></div>
             <textarea class="form-control" name="customer_message" rows="6" placeholder="Ej: Hola, necesito una cotizacion para..." required><?= e((string) ($simulation['message'] ?? '')) ?></textarea>
             <button class="btn btn-primary"><i class="bi bi-stars"></i>Generar respuesta de prueba</button>
