@@ -64,7 +64,7 @@ if (!isset($tabs[$section])) {
     $section = 'summary';
 }
 $activeTab = $tabs[$section];
-$scopedSections = ['summary', 'company', 'products', 'personality', 'rules', 'faqs', 'examples', 'documents', 'simulator'];
+$scopedSections = ['summary', 'company', 'products', 'personality', 'rules', 'faqs', 'examples', 'simulator'];
 $trainingSectionUrl = static function (string $key, ?int $brandRouteId = null) use (&$selectedBrandRouteId): string {
     $query = ['section' => $key];
     $targetBrandRouteId = $brandRouteId ?? $selectedBrandRouteId;
@@ -428,7 +428,6 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     <section class="controls-detail-grid mt-4">
         <form class="panel control-entry-form" method="post" action="<?= url('/ai-training/document') ?>" enctype="multipart/form-data">
             <?= csrf_field() ?>
-            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">Fuente documental</span><h2>Subir documento</h2></div></div>
             <input class="form-control" type="file" name="document" accept=".pdf,.docx,.xlsx,.csv,.txt" required>
             <div class="control-create-grid">
@@ -441,7 +440,6 @@ $progress = (int) ($session['progress_percent'] ?? 0);
 
         <form class="panel control-entry-form" method="get" action="<?= url('/ai-training') ?>">
             <input type="hidden" name="section" value="documents">
-            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
             <div class="panel-title"><div><span class="eyebrow">Recuperacion</span><h2>Buscar conocimiento</h2></div></div>
             <input class="form-control" name="knowledge_q" value="<?= e((string) $knowledgeQuery) ?>" placeholder="Ej: garantia, despacho, precios, condiciones">
             <button class="btn btn-outline-primary"><i class="bi bi-search"></i>Buscar fragmentos</button>
