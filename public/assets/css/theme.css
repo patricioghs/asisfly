@@ -1,5 +1,6 @@
 :root {
-  --asisty-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --asisty-font: Manrope, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --asisty-display-font: "Plus Jakarta Sans", Manrope, ui-sans-serif, system-ui, sans-serif;
   --asisty-bg: #f8fafc;
   --asisty-bg-soft: #f9fbff;
   --asisty-surface: #ffffff;
@@ -34,6 +35,22 @@ body {
   color: var(--asisty-text);
   font-family: var(--asisty-font);
   font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.brand,
+.metric-card strong {
+  font-family: var(--asisty-display-font);
 }
 
 a {
@@ -193,6 +210,7 @@ a {
   color: var(--asisty-text);
   font-size: 1.5rem;
   font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .topbar-copy small,
@@ -261,7 +279,8 @@ a {
 .auth-card h2 {
   color: var(--asisty-text);
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 750;
+  letter-spacing: -0.005em;
 }
 
 .section-heading {
@@ -275,7 +294,8 @@ a {
 .section-heading h3 {
   color: var(--asisty-text);
   font-size: 1rem;
-  font-weight: 850;
+  font-weight: 750;
+  letter-spacing: -0.005em;
   margin: 2px 0 0;
 }
 
@@ -303,6 +323,8 @@ a {
   color: var(--asisty-primary-2);
   font-size: 0.72rem;
   letter-spacing: 0.04em;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .btn {
@@ -3537,6 +3559,39 @@ a {
 [data-bs-theme="dark"] .account-credential-summary dd,
 [data-bs-theme="dark"] .account-empty-state h2 {
   color: #f8fafc;
+}
+
+/* Typography refinement: keeps AsisFly premium without the heavy, dated feel. */
+.topbar h1,
+.dashboard-hero h2,
+.workbench-hero h2,
+.controls-hero h2,
+.control-detail-hero h2,
+.notifications-hero h2,
+.approval-hero h2,
+.approval-autonomy h2,
+.supervision-hero h2,
+.marketplace-hero h2 {
+  font-weight: 760;
+  letter-spacing: -0.018em;
+}
+
+.metric-card strong,
+.hero-status strong,
+.workbench-card strong,
+.supervision-stat strong,
+.marketplace-stat strong {
+  font-weight: 760;
+  letter-spacing: -0.012em;
+}
+
+.metric-card span,
+.metric-card small,
+.nav-section,
+.status-pill,
+.soft-badge,
+.workspace-badge {
+  font-weight: 700;
 }
 
 [data-bs-theme="dark"] .marketplace-summary span,
