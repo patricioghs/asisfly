@@ -33,29 +33,29 @@ $routingSummary = $supervisionReport['routingSummary'] ?? [];
 $brandRoutes = $brandRoutes ?? [];
 $filterQuery = http_build_query(array_filter($filters ?? [], fn ($value) => $value !== ''));
 $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(array_filter([...($filters ?? []), ...$extra], fn ($value) => $value !== '')));
+$metricMap = [];
+foreach (($metrics ?? []) as $metric) {
+    $metricMap[$metric['label']] = $metric['value'];
+}
 ?>
-<div class="inbox-hero panel supervision-hero">
+<div class="supervision-compact-head">
     <div>
         <span class="eyebrow">Centro de conversaciones IA</span>
         <h2>Centro de Supervision</h2>
-        <p>AsisFly trabaja primero. Aqui revisas excepciones, apruebas respuestas y tomas control solo cuando el empleado digital necesita apoyo humano.</p>
+        <p>Revisa solo las conversaciones donde AsisFly necesita tu criterio.</p>
     </div>
-    <div class="inbox-metrics supervision-metrics">
-        <?php foreach ($metrics as $metric): ?>
-            <div><span><?= e($metric['label']) ?></span><strong><?= e($metric['value']) ?></strong></div>
-        <?php endforeach; ?>
+    <div class="supervision-head-stats">
+        <a href="<?= e($quickFilter(['ai_state' => 'approval_required', 'intervention' => ''])) ?>"><strong><?= e((string) ($metricMap['Por aprobar'] ?? 0)) ?></strong><span>Por aprobar</span></a>
+        <a href="<?= e($quickFilter(['ai_state' => 'human_required', 'intervention' => ''])) ?>"><strong><?= e((string) ($metricMap['Requieren humano'] ?? 0)) ?></strong><span>Requieren humano</span></a>
+        <span><strong><?= e((string) ($metricMap['Autonomia'] ?? '0%')) ?></strong><span>Autonomia IA</span></span>
     </div>
 </div>
 
-<section class="panel mt-4 supervision-audit-panel">
-    <div class="panel-title">
-        <div>
-            <span class="eyebrow">Auditoria del trabajador virtual</span>
-            <h2>Decisiones, autonomia y contexto usado</h2>
-        </div>
+<details class="panel supervision-insights mt-3">
+    <summary><span><i class="bi bi-bar-chart-line"></i> Resumen de autonomia y auditoria</span><i class="bi bi-chevron-down"></i></summary>
+    <div class="supervision-insights-body">
         <a class="soft-badge" href="<?= url('/ai-training?section=settings') ?>">Ajustar autonomia <i class="bi bi-arrow-right"></i></a>
-    </div>
-    <div class="supervision-audit-grid">
+        <div class="supervision-audit-grid">
         <article>
             <span>Por aprobar</span>
             <strong><?= e((string) ($decisionCounts['approval_required'] ?? 0)) ?></strong>
@@ -86,26 +86,33 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
             <strong><?= e((string) ($routingSummary['unrouted'] ?? 0)) ?></strong>
             <small><?= e((string) ($routingSummary['uncertain'] ?? 0)) ?> conversaciones dudosas.</small>
         </article>
-    </div>
-    <div class="supervision-policy-list">
+        </div>
+        <div class="supervision-policy-list">
         <?php foreach (array_slice($channelSettings, 0, 5) as $setting): ?>
             <span><i class="bi bi-sliders"></i><?= e((string) $setting['channel']) ?>: <?= e((string) $setting['mode']) ?> / <?= e((string) $setting['min_confidence']) ?>%</span>
         <?php endforeach; ?>
         <?php if (!$channelSettings): ?><span><i class="bi bi-shield-lock"></i>Sin reglas por canal: modo manual seguro.</span><?php endif; ?>
-    </div>
-    <?php if ($recentContexts): ?>
-        <div class="supervision-policy-list">
+        </div>
+        <?php if ($recentContexts): ?>
+            <div class="supervision-policy-list">
             <?php foreach ($recentContexts as $context): ?>
                 <span><i class="bi bi-database-check"></i>Contexto #<?= e((string) $context['id']) ?> / <?= e((string) $context['token_estimate']) ?> tokens</span>
             <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-</section>
+            </div>
+        <?php endif; ?>
+    </div>
+</details>
 
-<div class="inbox-layout mt-4">
+<div class="inbox-layout inbox-premium-layout mt-3">
     <aside class="panel inbox-list supervision-list">
-        <form class="module-filter-bar" method="get" action="<?= url('/inbox') ?>">
+        <div class="inbox-list-head"><div><span class="eyebrow">Supervision</span><h3>Conversaciones</h3></div><span class="soft-badge"><?= e((string) count($conversations)) ?></span></div>
+        <form class="inbox-compact-filter" method="get" action="<?= url('/inbox') ?>">
             <input class="form-control" name="q" value="<?= e($filters['q'] ?? '') ?>" placeholder="Buscar cliente, asunto o motivo">
+            <button class="btn btn-primary icon-button" title="Buscar" aria-label="Buscar"><i class="bi bi-search"></i></button>
+            <a class="btn btn-outline-secondary icon-button" href="<?= url('/inbox') ?>" title="Limpiar filtros" aria-label="Limpiar filtros"><i class="bi bi-arrow-counterclockwise"></i></a>
+            <details class="inbox-advanced-filters">
+                <summary><i class="bi bi-sliders"></i>Filtros</summary>
+                <div>
             <select class="form-select" name="channel">
                 <option value="">Todos los canales</option>
                 <?php foreach (['WhatsApp', 'Instagram', 'Messenger', 'Email'] as $channel): ?>
@@ -154,20 +161,19 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                 <input type="checkbox" name="intervention" value="1" <?= !empty($filters['intervention']) ? 'checked' : '' ?>>
                 <span>Solo intervencion</span>
             </label>
-            <button class="btn btn-primary"><i class="bi bi-funnel"></i> Filtrar</button>
-            <a class="btn btn-outline-secondary" href="<?= url('/inbox') ?>">Limpiar</a>
+                    <button class="btn btn-primary"><i class="bi bi-funnel"></i> Aplicar filtros</button>
+                </div>
+            </details>
         </form>
 
         <div class="supervision-quick-filters">
-            <a class="<?= !empty($filters['intervention']) ? 'active' : '' ?>" href="<?= e($quickFilter(['intervention' => '1', 'ai_state' => ''])) ?>"><i class="bi bi-person-exclamation"></i> Necesitan mi intervencion</a>
-            <a class="<?= ($filters['ai_state'] ?? '') === 'approval_required' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'approval_required', 'intervention' => ''])) ?>"><i class="bi bi-shield-check"></i> Por aprobar</a>
-            <a class="<?= ($filters['ai_state'] ?? '') === 'human_required' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'human_required', 'intervention' => ''])) ?>"><i class="bi bi-person-raised-hand"></i> Requieren humano</a>
-            <a class="<?= ($filters['ai_state'] ?? '') === 'ai_resolved' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'ai_resolved', 'intervention' => ''])) ?>"><i class="bi bi-check2-circle"></i> Resueltas por IA</a>
-            <a class="<?= ($filters['routing_status'] ?? '') === 'unrouted' ? 'active' : '' ?>" href="<?= e($quickFilter(['routing_status' => 'unrouted', 'brand_route_id' => ''])) ?>"><i class="bi bi-signpost"></i> Sin marca</a>
-            <a class="<?= ($filters['routing_status'] ?? '') === 'manual' ? 'active' : '' ?>" href="<?= e($quickFilter(['routing_status' => 'manual', 'brand_route_id' => ''])) ?>"><i class="bi bi-patch-check"></i> Confirmadas</a>
+            <a class="<?= empty($filters['intervention']) && ($filters['ai_state'] ?? '') === '' ? 'active' : '' ?>" href="<?= url('/inbox') ?>">Todas</a>
+            <a class="<?= ($filters['ai_state'] ?? '') === 'approval_required' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'approval_required', 'intervention' => ''])) ?>">Por aprobar</a>
+            <a class="<?= ($filters['ai_state'] ?? '') === 'human_required' ? 'active' : '' ?>" href="<?= e($quickFilter(['ai_state' => 'human_required', 'intervention' => ''])) ?>">Requieren humano</a>
+            <a class="<?= !empty($filters['intervention']) ? 'active' : '' ?>" href="<?= e($quickFilter(['intervention' => '1', 'ai_state' => ''])) ?>">Mi intervencion</a>
         </div>
 
-        <div class="supervision-section-label">Prioridad humana</div>
+        <div class="supervision-section-label">Ordenadas por prioridad</div>
         <?php foreach ($conversations as $conversation): ?>
             <a class="inbox-row supervision-row <?= $selected && (int) $selected['id'] === (int) $conversation['id'] ? 'active' : '' ?>" href="<?= url('/inbox?id=' . (int) $conversation['id'] . ($filterQuery ? '&' . $filterQuery : '')) ?>">
                 <div class="supervision-row-head">
@@ -177,14 +183,11 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                 <p><?= e($conversation['subject']) ?></p>
                 <small>
                     <span class="ai-state-pill state-<?= e($conversation['ai_state'] ?? 'human_required') ?>"><i class="bi bi-cpu"></i><?= e($conversation['ai_state_label'] ?? 'Requiere supervision') ?></span>
-                    <span class="priority priority-<?= e($conversation['priority']) ?>"><i class="bi <?= e($priorityIcons[$conversation['priority']] ?? 'bi-dot') ?>"></i><?= e($priorityOptions[$conversation['priority']] ?? $conversation['priority']) ?></span>
-                    <span class="assignee-chip"><i class="bi bi-diagram-3"></i><?= e($brainLabels[$conversation['account_brain'] ?? ''] ?? 'General') ?></span>
                     <?php if (!empty($conversation['brand_detection']['brand_name'])): ?>
-                        <span class="assignee-chip"><i class="bi bi-signpost-split"></i><?= e($conversation['brand_detection']['brand_name']) ?> - <?= e((string) $conversation['brand_detection']['confidence']) ?>%</span>
+                        <span class="assignee-chip"><i class="bi bi-signpost-split"></i><?= e($conversation['brand_detection']['brand_name']) ?></span>
                     <?php endif; ?>
-                    <?= !empty($conversation['assigned_name']) ? '<span class="assignee-chip"><i class="bi bi-person"></i>' . e($conversation['assigned_name']) . '</span>' : '' ?>
                 </small>
-                <em><?= e($conversation['ai_activity'] ?? 'AsisFly reviso la conversacion') ?> - <?= e((string) ($conversation['ai_confidence'] ?? 0)) ?>% confianza</em>
+                <em><?= e($conversation['last_message'] ?? $conversation['ai_activity'] ?? 'AsisFly reviso la conversacion') ?></em>
             </a>
         <?php endforeach; ?>
         <?php if (!$conversations): ?>
@@ -213,6 +216,10 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                     <h3><?= e($selected['ai_activity'] ?? 'AsisFly reviso la conversacion') ?></h3>
                     <p><?= e($selected['ai_summary'] ?? '') ?></p>
                     <small><?= e($selected['ai_reason'] ?? '') ?></small>
+                    <?php if (!empty($selected['brand_detection']['brand_name']) || $brandRoutes || !empty($selected['ai_decision'])): ?>
+                    <details class="supervision-context-details compact">
+                        <summary>Ver contexto y decision IA</summary>
+                        <div>
                     <?php if (!empty($selected['brand_detection']['brand_name'])): ?>
                         <div class="supervision-decision-tags">
                             <span><i class="bi bi-signpost-split"></i> <?= in_array(($selected['brand_detection']['status'] ?? ''), ['confirmed', 'corrected'], true) ? 'Marca confirmada' : 'Marca sugerida' ?>: <?= e($selected['brand_detection']['brand_name']) ?></span>
@@ -245,6 +252,9 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                             <span><i class="bi bi-sliders"></i> <?= e((string) ($selected['ai_decision']['autonomy_mode'] ?? 'supervised_learning')) ?></span>
                         </div>
                     <?php endif; ?>
+                        </div>
+                    </details>
+                    <?php endif; ?>
                 </div>
                 <div class="supervision-confidence">
                     <strong><?= e((string) ($selected['ai_confidence'] ?? 0)) ?>%</strong>
@@ -253,7 +263,9 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
             </section>
 
             <?php if (!empty($selected['decision_timeline'])): ?>
-                <section class="supervision-decision-timeline">
+                <details class="supervision-context-details">
+                    <summary>Ver auditoria de decisiones IA</summary>
+                    <section class="supervision-decision-timeline">
                     <div>
                         <span class="eyebrow">Historial de decisiones</span>
                         <h3>Que hizo AsisFly</h3>
@@ -287,7 +299,8 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
                             </div>
                         </article>
                     <?php endforeach; ?>
-                </section>
+                    </section>
+                </details>
             <?php endif; ?>
 
             <div class="supervision-actions">
@@ -418,14 +431,8 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
     </section>
 </div>
 
-<div class="panel mt-4 compact-connectors">
-    <div class="panel-title">
-        <div>
-            <span class="eyebrow">Canales conectados</span>
-            <h2>Fuentes que alimentan al trabajador virtual</h2>
-        </div>
-        <a class="soft-badge" href="<?= url('/integrations') ?>">Configurar canales <i class="bi bi-arrow-right"></i></a>
-    </div>
+<details class="panel compact-connectors mt-3">
+    <summary><span><i class="bi bi-plug"></i> Canales conectados</span><a class="soft-badge" href="<?= url('/integrations') ?>">Configurar <i class="bi bi-arrow-right"></i></a></summary>
     <div class="omni-account-grid compact">
         <?php foreach ($accounts as $account): ?>
             <article>
@@ -437,4 +444,4 @@ $quickFilter = fn (array $extra): string => url('/inbox?' . http_build_query(arr
             </article>
         <?php endforeach; ?>
     </div>
-</div>
+</details>
