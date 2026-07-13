@@ -71,6 +71,7 @@ final class AbilityRegistry
             'Asistente' => [
                 ['/chat', 'Chat IA', 'bi-stars', null],
                 ['/tasks', 'Tareas', 'bi-list-task', null],
+                ['/bookings', 'Agenda y reservas', 'bi-calendar-week', null],
                 ['/automations', 'Automatizaciones', 'bi-magic', null],
                 ['/actions', 'Aprobaciones', 'bi-check2-square', null],
                 ['/controls', 'Controles', 'bi-sliders', null],

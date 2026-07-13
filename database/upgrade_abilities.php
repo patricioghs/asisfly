@@ -29,6 +29,7 @@ try {
         __DIR__ . '/migrations/036_simplify_knowledge_navigation.sql',
         __DIR__ . '/migrations/037_simplify_integrations_navigation.sql',
         __DIR__ . '/migrations/038_ai_brand_onboarding_answers.sql',
+        __DIR__ . '/migrations/039_smart_booking_schema.sql',
     ] as $file) {
         $sql = file_get_contents($file);
         if ($sql === false) {
