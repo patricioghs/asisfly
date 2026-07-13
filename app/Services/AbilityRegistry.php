@@ -66,7 +66,6 @@ final class AbilityRegistry
         return [
             'Inicio' => [
                 ['/dashboard', 'Dashboard', 'bi-grid-1x2', null],
-                ['/workbench', 'Bandeja de trabajo', 'bi-briefcase', null],
             ],
             'Asistente' => [
                 ['/chat', 'Chat IA', 'bi-stars', null],

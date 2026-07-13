@@ -11,7 +11,7 @@ final class MarketplaceService
 {
     private const PROTECTED_ABILITIES = ['core_workspace', 'core_company_admin', 'core_superadmin'];
     private const CATALOG = [
-        'core_workspace' => ['name' => 'Core Workspace', 'label' => 'Operacion diaria', 'category' => 'core', 'description' => 'Dashboard, Mi dia, Bandeja de trabajo y Notificaciones para operar cada jornada.', 'is_core' => true, 'default' => true, 'sort' => 10],
+        'core_workspace' => ['name' => 'Core Workspace', 'label' => 'Inicio y resumen', 'category' => 'core', 'description' => 'Dashboard para el resumen ejecutivo diario. Las acciones operativas se gestionan desde Tareas y sus modulos de origen.', 'is_core' => true, 'default' => true, 'sort' => 10],
         'core_ai_assistant' => ['name' => 'Core AI Assistant', 'label' => 'Asistente inteligente', 'category' => 'core', 'description' => 'Chat IA, tareas, automatizaciones, aprobaciones, controles y reglas del asistente.', 'is_core' => true, 'default' => true, 'sort' => 20],
         'core_omnichannel' => ['name' => 'Core Omnichannel', 'label' => 'Comunicacion inteligente', 'category' => 'base', 'description' => 'Bandeja omnicanal y cuentas conectadas para centralizar correos y mensajes.', 'is_core' => true, 'default' => true, 'sort' => 30],
         'core_memory_documents' => ['name' => 'Core Memory Documents', 'label' => 'Memoria empresarial', 'category' => 'base', 'description' => 'Documentos, base de conocimiento, catalogos, manuales y entrenamiento empresarial.', 'is_core' => true, 'default' => true, 'sort' => 40],

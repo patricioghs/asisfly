@@ -32,6 +32,7 @@ try {
         __DIR__ . '/migrations/039_smart_booking_schema.sql',
         __DIR__ . '/migrations/040_email_sync_runs_schema.sql',
         __DIR__ . '/migrations/041_task_source_links.sql',
+        __DIR__ . '/migrations/042_hide_workbench_navigation.sql',
     ] as $file) {
         $sql = file_get_contents($file);
         if ($sql === false) {

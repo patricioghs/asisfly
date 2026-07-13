@@ -133,6 +133,6 @@ $filterFields = function () use ($filters): void { ?>
             <i class="bi bi-check2-circle"></i>
             <div><strong>Baja</strong><p>Actualizaciones informativas, eventos registrados y actividad sin riesgo inmediato.</p></div>
         </div>
-        <a class="btn btn-outline-secondary w-100" href="<?= url('/workbench') ?>"><i class="bi bi-briefcase"></i> Ir a Bandeja de trabajo</a>
+        <a class="btn btn-outline-secondary w-100" href="<?= url('/tasks') ?>"><i class="bi bi-list-task"></i> Ir a Tareas</a>
     </aside>
 </section>

@@ -33,21 +33,13 @@ final class HomeController extends Controller
     {
         $this->requireAuth();
 
-        $filters = [
-            'view' => trim((string) ($_GET['view'] ?? 'mine')),
-            'type' => trim((string) ($_GET['type'] ?? '')),
-            'priority' => trim((string) ($_GET['priority'] ?? '')),
+        // La bandeja anterior queda disponible solo como URL compatible.
+        // Tareas es ahora el punto de entrada operativo y conserva los enlaces al origen.
+        $query = http_build_query(array_filter([
             'q' => trim((string) ($_GET['q'] ?? '')),
-        ];
-        $items = $this->workbenchItems($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $filters);
-
-        $this->view('home/workbench', [
-            'title' => 'Bandeja de trabajo',
-            'items' => $items,
-            'filters' => $filters,
-            'metrics' => $this->workbenchMetrics($items),
-            'company' => $this->currentCompany(),
-        ]);
+            'priority' => trim((string) ($_GET['priority'] ?? '')),
+        ], fn ($value) => $value !== ''));
+        $this->redirect('/tasks' . ($query !== '' ? '?' . $query : ''));
     }
 
     public function completeWorkbenchTask(): void
@@ -68,7 +60,7 @@ final class HomeController extends Controller
             'priority' => $_POST['filter_priority'] ?? null,
             'q' => $_POST['filter_q'] ?? null,
         ], fn ($value) => $value !== null && $value !== ''));
-        $this->redirect('/workbench' . ($query ? '?' . $query : ''));
+        $this->redirect('/tasks' . ($query ? '?' . $query : ''));
     }
 
     public function markWorkbenchMessageReviewed(): void
@@ -89,7 +81,7 @@ final class HomeController extends Controller
             ]);
         }
 
-        $this->redirect('/workbench' . $this->workbenchFilterQuery($_POST));
+        $this->redirect('/inbox');
     }
 
     public function markWorkbenchEmailsReviewed(): void
@@ -106,7 +98,7 @@ final class HomeController extends Controller
             )->execute(['company_id' => $this->companyId()]);
         }
 
-        $this->redirect('/workbench' . $this->workbenchFilterQuery($_POST));
+        $this->redirect('/inbox');
     }
 
     public function notifications(): void
