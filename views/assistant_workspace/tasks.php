@@ -5,33 +5,27 @@ $priorityLabels = ['critical' => 'Critica', 'high' => 'Alta', 'medium' => 'Media
 $priorityIcons = ['critical' => 'bi-exclamation-octagon', 'high' => 'bi-arrow-up-circle', 'medium' => 'bi-dot', 'low' => 'bi-arrow-down-circle'];
 $typeLabels = ['follow_up' => 'Seguimiento', 'call' => 'Llamada', 'email' => 'Email', 'meeting' => 'Reunion', 'quote' => 'Cotizacion', 'todo' => 'Tarea'];
 $typeIcons = ['follow_up' => 'bi-arrow-repeat', 'call' => 'bi-telephone', 'email' => 'bi-envelope', 'meeting' => 'bi-calendar-event', 'quote' => 'bi-file-earmark-text', 'todo' => 'bi-list-check'];
-$pendingCount = (int) array_reduce($metrics, fn ($carry, $metric) => $metric['status'] === 'pending' ? $metric['value'] : $carry, 0);
+$metricByStatus = [];
+foreach ($metrics as $metric) {
+    $metricByStatus[$metric['status']] = (int) $metric['value'];
+}
+$quickTask = fn (array $extra): string => url('/tasks?' . http_build_query(array_filter([...$filters, ...$extra], fn ($value) => $value !== '')));
 ?>
 
-<section class="panel launch-hero">
+<section class="task-compact-head">
     <div>
         <span class="eyebrow">Asistente</span>
         <h2>Tareas</h2>
-        <p>Gestiona pendientes creados por usuarios, CRM y AsisFly. Filtra terminadas, cambia estado y asigna responsables sin salir del modulo.</p>
+        <p>Prioriza, asigna y completa el trabajo de tu equipo y de AsisFly.</p>
     </div>
-    <div class="launch-next">
-        <span>Pendientes</span>
-        <strong><?= e((string) $pendingCount) ?> tareas</strong>
-        <small>Separadas por empresa y priorizadas por impacto.</small>
+    <div class="task-head-stats">
+        <a class="<?= ($filters['status'] ?? '') === 'pending' ? 'active' : '' ?>" href="<?= e($quickTask(['status' => 'pending'])) ?>"><strong><?= e((string) ($metricByStatus['pending'] ?? 0)) ?></strong><span>Pendientes</span></a>
+        <a class="<?= ($filters['status'] ?? '') === 'done' ? 'active' : '' ?>" href="<?= e($quickTask(['status' => 'done'])) ?>"><strong><?= e((string) ($metricByStatus['done'] ?? 0)) ?></strong><span>Terminadas</span></a>
+        <a class="<?= ($filters['status'] ?? '') === 'cancelled' ? 'active' : '' ?>" href="<?= e($quickTask(['status' => 'cancelled'])) ?>"><strong><?= e((string) ($metricByStatus['cancelled'] ?? 0)) ?></strong><span>Canceladas</span></a>
     </div>
 </section>
 
-<section class="crm-metrics mt-4">
-    <?php foreach ($metrics as $metric): ?>
-        <article class="metric-card">
-            <span><?= e($metric['label']) ?></span>
-            <strong><?= e($metric['value']) ?></strong>
-            <small><?= e($statusLabels[$metric['status']] ?? $metric['status']) ?></small>
-        </article>
-    <?php endforeach; ?>
-</section>
-
-<form class="panel task-filter-bar mt-4" method="get" action="<?= url('/tasks') ?>">
+<form class="panel task-compact-filter mt-3" method="get" action="<?= url('/tasks') ?>">
     <input class="form-control" name="q" value="<?= e($filters['q'] ?? '') ?>" placeholder="Buscar tarea, cliente o contacto">
     <select class="form-select" name="status">
         <option value="">Todos los estados</option>
@@ -39,30 +33,36 @@ $pendingCount = (int) array_reduce($metrics, fn ($carry, $metric) => $metric['st
             <option value="<?= e($value) ?>" <?= ($filters['status'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
         <?php endforeach; ?>
     </select>
-    <select class="form-select" name="assigned_to">
-        <option value="">Todos los responsables</option>
-        <option value="none" <?= ($filters['assigned_to'] ?? '') === 'none' ? 'selected' : '' ?>>Sin responsable</option>
-        <?php foreach ($users as $user): ?>
-            <option value="<?= e((string) $user['id']) ?>" <?= (string) ($filters['assigned_to'] ?? '') === (string) $user['id'] ? 'selected' : '' ?>><?= e($user['name']) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <select class="form-select" name="priority">
-        <option value="">Todas las prioridades</option>
-        <?php foreach ($priorityLabels as $value => $label): ?>
-            <option value="<?= e($value) ?>" <?= ($filters['priority'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <button class="btn btn-primary">Filtrar</button>
-    <a class="btn btn-outline-secondary" href="<?= url('/tasks') ?>">Limpiar</a>
+    <button class="btn btn-primary icon-button" title="Buscar" aria-label="Buscar"><i class="bi bi-search"></i></button>
+    <a class="btn btn-outline-secondary icon-button" href="<?= url('/tasks') ?>" title="Limpiar filtros" aria-label="Limpiar filtros"><i class="bi bi-arrow-counterclockwise"></i></a>
+    <details class="task-advanced-filters">
+        <summary><i class="bi bi-sliders"></i>Filtros</summary>
+        <div>
+            <select class="form-select" name="assigned_to">
+                <option value="">Todos los responsables</option>
+                <option value="none" <?= ($filters['assigned_to'] ?? '') === 'none' ? 'selected' : '' ?>>Sin responsable</option>
+                <?php foreach ($users as $user): ?>
+                    <option value="<?= e((string) $user['id']) ?>" <?= (string) ($filters['assigned_to'] ?? '') === (string) $user['id'] ? 'selected' : '' ?>><?= e($user['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select class="form-select" name="priority">
+                <option value="">Todas las prioridades</option>
+                <?php foreach ($priorityLabels as $value => $label): ?>
+                    <option value="<?= e($value) ?>" <?= ($filters['priority'] ?? '') === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <button class="btn btn-primary"><i class="bi bi-funnel"></i> Aplicar filtros</button>
+        </div>
+    </details>
 </form>
 
-<section class="panel mt-4">
-    <div class="panel-title">
+<section class="panel task-list-panel mt-3">
+    <div class="task-list-head">
         <div>
-            <span class="eyebrow">Trabajo del asistente</span>
-            <h2>Lista de tareas</h2>
+            <span class="eyebrow">Trabajo activo</span>
+            <h2><?= e((string) count($tasks)) ?> tareas</h2>
         </div>
-        <a href="<?= url('/crm') ?>">Ver CRM <i class="bi bi-arrow-right"></i></a>
+        <a class="soft-badge" href="<?= url('/crm') ?>">Ver CRM <i class="bi bi-arrow-right"></i></a>
     </div>
     <div class="task-board">
         <?php foreach ($tasks as $task): ?>
@@ -105,22 +105,27 @@ $pendingCount = (int) array_reduce($metrics, fn ($carry, $metric) => $metric['st
                     </select>
                     <button class="btn btn-sm btn-outline-primary">Actualizar</button>
                 </form>
-                <div class="task-collab">
-                    <div class="task-collab-head">
-                        <div>
-                            <span class="eyebrow">Colaboracion interna</span>
-                            <strong>Comentarios e historial</strong>
+                <details class="task-collab">
+                    <summary>
+                        <span><i class="bi bi-chat-left-text"></i> Colaboracion e historial</span>
+                        <small><?= e((string) (count($task['comments'] ?? []) + count($task['events'] ?? []))) ?> movimientos</small>
+                    </summary>
+                    <div class="task-collab-body">
+                        <div class="task-collab-head">
+                            <div>
+                                <span class="eyebrow">Colaboracion interna</span>
+                                <strong>Comentarios e historial</strong>
+                            </div>
+                            <form method="post" action="<?= url('/tasks/request-update') ?>">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="task_id" value="<?= e((string) ($task['id'] ?? 0)) ?>">
+                                <input type="hidden" name="filter_q" value="<?= e($filters['q'] ?? '') ?>">
+                                <input type="hidden" name="filter_status" value="<?= e($filters['status'] ?? '') ?>">
+                                <input type="hidden" name="filter_assigned_to" value="<?= e($filters['assigned_to'] ?? '') ?>">
+                                <input type="hidden" name="filter_priority" value="<?= e($filters['priority'] ?? '') ?>">
+                                <button class="btn btn-sm btn-light" type="submit"><i class="bi bi-send"></i> Pedir actualizacion</button>
+                            </form>
                         </div>
-                        <form method="post" action="<?= url('/tasks/request-update') ?>">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="task_id" value="<?= e((string) ($task['id'] ?? 0)) ?>">
-                            <input type="hidden" name="filter_q" value="<?= e($filters['q'] ?? '') ?>">
-                            <input type="hidden" name="filter_status" value="<?= e($filters['status'] ?? '') ?>">
-                            <input type="hidden" name="filter_assigned_to" value="<?= e($filters['assigned_to'] ?? '') ?>">
-                            <input type="hidden" name="filter_priority" value="<?= e($filters['priority'] ?? '') ?>">
-                            <button class="btn btn-sm btn-light" type="submit"><i class="bi bi-send"></i> Pedir actualizacion</button>
-                        </form>
-                    </div>
 
                     <div class="task-collab-grid">
                         <div class="task-comment-panel">
@@ -162,7 +167,8 @@ $pendingCount = (int) array_reduce($metrics, fn ($carry, $metric) => $metric['st
                             <?php endif; ?>
                         </div>
                     </div>
-                </div>
+                    </div>
+                </details>
             </article>
         <?php endforeach; ?>
         <?php if (!$tasks): ?>
