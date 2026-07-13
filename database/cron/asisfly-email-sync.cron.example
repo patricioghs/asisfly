@@ -1,0 +1,2 @@
+# Cada 10 minutos. Ajusta la ruta de PHP si tu VPS usa otra version.
+*/10 * * * * /usr/bin/flock -n /tmp/asisfly-email-sync.lock /usr/bin/php /var/www/html/staging-asisfly/database/sync_email_accounts.php >> /var/www/html/staging-asisfly/logs/email-sync-cron.log 2>&1
