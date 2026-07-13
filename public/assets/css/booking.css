@@ -1,0 +1,36 @@
+/* Reserva publica: hoja aislada para no depender de la cache del tema de la aplicacion. */
+:root { --booking-ink: #101828; --booking-muted: #667085; --booking-line: #e2e8f0; --booking-primary: #4f46e5; }
+.booking-public-body { background: #f6f8fc; color: var(--booking-ink); font-family: Manrope, system-ui, sans-serif; min-height: 100vh; }
+.booking-public-wrap { margin: 0 auto; max-width: 820px; padding: 56px 20px; }
+.booking-public-head { align-items: center; display: grid; gap: 10px; justify-items: center; margin: 0 auto 24px; max-width: 620px; text-align: center; }
+.public-brand { align-items: center; color: var(--booking-primary); display: inline-flex; font-size: .82rem; font-weight: 800; gap: 8px; }
+.public-brand i { align-items: center; background: #e0e7ff; border-radius: 10px; display: inline-flex; font-size: 1rem; height: 34px; justify-content: center; width: 34px; }
+.booking-public-head h1 { font-family: "Plus Jakarta Sans", Manrope, sans-serif; font-size: clamp(1.75rem, 5vw, 2.5rem); font-weight: 800; letter-spacing: 0; line-height: 1.16; margin: 2px 0; }
+.booking-public-head p { color: var(--booking-muted); margin: 0; max-width: 540px; }
+.booking-public-head small { color: #7c879b; font-size: .8rem; }
+.booking-public-card { background: #fff; border: 1px solid var(--booking-line); border-radius: 18px; box-shadow: 0 20px 52px rgba(15, 23, 42, .08); display: grid; gap: 24px; padding: 28px; }
+.booking-public-alert { align-items: center; border-radius: 12px; display: flex; gap: 8px; margin-bottom: 16px; }
+.booking-public-picker { display: grid; gap: 10px; }
+.booking-public-picker > label { font-size: .9rem; font-weight: 800; }
+.booking-public-picker .form-select, .booking-public-form .form-control { border-color: #d8e0ec; border-radius: 10px; box-shadow: none; min-height: 46px; }
+.booking-public-picker .form-select:focus, .booking-public-form .form-control:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99,102,241,.12); }
+.booking-public-days { display: grid; gap: 8px; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow-x: auto; padding: 2px 0; }
+.booking-public-days button { background: #fff; border: 1px solid #dbe3ee; border-radius: 12px; color: var(--booking-muted); display: grid; gap: 1px; justify-items: center; min-height: 74px; padding: 8px 5px; transition: .18s ease; }
+.booking-public-days button:hover, .booking-public-days button.active { background: #eef2ff; border-color: #818cf8; color: #4338ca; transform: translateY(-1px); }
+.booking-public-days small, .booking-public-days span { font-size: .66rem; font-weight: 700; }
+.booking-public-days strong { color: currentColor; font-family: "Plus Jakarta Sans", sans-serif; font-size: 1.15rem; }
+.booking-slots { border-top: 1px solid #edf1f6; display: grid; gap: 12px; padding-top: 22px; }
+.booking-slots h2 { font-family: "Plus Jakarta Sans", sans-serif; font-size: 1rem; margin: 0; }
+.booking-slots p { color: var(--booking-muted); font-size: .88rem; margin: 0; }
+.booking-slots > div { display: flex; flex-wrap: wrap; gap: 9px; }
+.booking-slot { background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; color: #334155; font-size: .9rem; font-weight: 800; min-width: 82px; padding: 10px 13px; transition: .18s ease; }
+.booking-slot:hover, .booking-slot.active { background: var(--booking-primary); border-color: var(--booking-primary); box-shadow: 0 8px 15px rgba(79,70,229,.2); color: #fff; }
+.booking-public-form { border-top: 1px solid #edf1f6; display: grid; gap: 11px; padding-top: 22px; }
+.booking-public-form > p { color: #4f46e5; font-size: .86rem; font-weight: 800; margin: 0; }
+.booking-public-form textarea.form-control { min-height: 76px; padding-top: 11px; }
+.booking-public-form .form-grid { display: grid; gap: 11px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.booking-public-form .btn { align-items: center; background: linear-gradient(100deg, #2563eb, #7c3aed); border: 0; border-radius: 10px; box-shadow: 0 10px 20px rgba(79,70,229,.22); display: inline-flex; gap: 9px; justify-content: center; justify-self: start; min-height: 46px; padding: 0 20px; }
+.booking-public-card.empty-state { justify-items: center; margin-top: 14vh; text-align: center; }
+.booking-public-card.empty-state h1 { font-family: "Plus Jakarta Sans", sans-serif; font-size: 1.55rem; margin: 0; }
+.booking-public-card.empty-state p { color: var(--booking-muted); margin: 0; }
+@media (max-width: 640px) { .booking-public-wrap { padding: 30px 14px; } .booking-public-card { border-radius: 15px; gap: 20px; padding: 17px; } .booking-public-days { grid-template-columns: repeat(7, 64px); } .booking-public-form .form-grid { grid-template-columns: 1fr; } .booking-public-head h1 { font-size: 1.8rem; } }
