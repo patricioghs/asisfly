@@ -16,6 +16,7 @@ use App\Services\BrandRoutingDetector;
 use App\Services\SecretVault;
 use App\Services\SmtpMailer;
 use App\Services\WhatsAppCloudClient;
+use App\Services\WhatsAppControlService;
 use PDO;
 
 final class OmnichannelRepository
@@ -437,6 +438,22 @@ final class OmnichannelRepository
 
             $this->rememberWhatsAppPhoneNumberId($account, $phoneNumberId, $displayPhoneNumber);
 
+            $control = (new WhatsAppControlService())->handle(
+                (int) $account['company_id'],
+                (int) $account['id'],
+                (array) ($item['payload'] ?? []),
+                $this->companyTimezone((int) $account['company_id'])
+            );
+            if ($control !== null) {
+                $send = $this->sendWhatsAppControlMessage($account, (string) (($item['payload'] ?? [])['customer_handle'] ?? ''), (string) ($control['message'] ?? 'Comando recibido.'));
+                $this->logEvent((int) $account['company_id'], (int) $account['id'], null, 'whatsapp_cloud', 'WhatsApp', 'control', $send['ok'] ? 'sent' : 'failed', $item, (string) ($send['message'] ?? 'Respuesta de control procesada.'));
+                $processed++;
+                if (empty($send['ok'])) {
+                    $lastError = (string) ($send['message'] ?? 'No se pudo responder el comando de control.');
+                }
+                continue;
+            }
+
             $result = $this->receiveWebhook((string) $account['webhook_token'], (array) ($item['payload'] ?? []));
             if (!empty($result['ok'])) {
                 $processed++;
@@ -767,6 +784,27 @@ final class OmnichannelRepository
             'settings_json' => json_encode($settings, JSON_UNESCAPED_UNICODE),
             'id' => (int) $account['id'],
         ]);
+    }
+
+    private function sendWhatsAppControlMessage(array $account, string $to, string $body): array
+    {
+        $credentials = $this->whatsAppCloudCredentials($account);
+        if (!$credentials) {
+            return ['ok' => false, 'message' => 'No hay credenciales WhatsApp disponibles para responder el comando.'];
+        }
+
+        return (new WhatsAppCloudClient())->sendText($credentials, $to, $body);
+    }
+
+    private function companyTimezone(int $companyId): string
+    {
+        try {
+            $statement = Database::connection()->prepare('SELECT timezone FROM companies WHERE id = :id LIMIT 1');
+            $statement->execute(['id' => $companyId]);
+            return (string) ($statement->fetchColumn() ?: 'America/Santiago');
+        } catch (\Throwable) {
+            return 'America/Santiago';
+        }
     }
 
     private function settings(array $account): array

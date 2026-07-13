@@ -4062,10 +4062,36 @@ a {
 .task-list-panel .task-collab[open] > summary { border-bottom: 1px solid var(--asisty-border); }
 .task-collab-body { display: grid; gap: 12px; padding: 11px; }
 
+/* Centro de control por WhatsApp */
+.control-whatsapp-layout { align-items: start; display: grid; gap: 16px; grid-template-columns: minmax(270px, 330px) minmax(0, 1fr); }
+.control-whatsapp-form { position: sticky; top: 16px; }
+.control-whatsapp-form h2 { color: var(--asisty-text); font-family: var(--font-display, inherit); font-size: 1.05rem; font-weight: 900; margin: 3px 0 0; }
+.control-whatsapp-main { min-width: 0; }
+.control-person-list, .control-command-list { display: grid; gap: 0; }
+.control-person-row { align-items: center; border-bottom: 1px solid var(--asisty-border); display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr) auto; padding: 13px 0; }
+.control-person-row:first-child { padding-top: 0; }
+.control-person-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.control-person-row strong { color: var(--asisty-text); display: block; font-size: .9rem; }
+.control-person-row p { color: var(--asisty-muted); font-size: .78rem; margin: 2px 0 3px; }
+.control-person-row small { color: var(--asisty-muted); font-size: .72rem; }
+.control-person-row small i { margin-right: 4px; }
+.control-person-actions { align-items: center; display: flex; gap: 7px; }
+.control-command-guide { display: grid; gap: 10px; }
+.control-command-guide > div:not(.panel-title) { align-items: center; border-top: 1px solid var(--asisty-border); display: grid; gap: 12px; grid-template-columns: minmax(190px, .65fr) minmax(0, 1fr); padding-top: 10px; }
+.control-command-guide code { color: var(--asisty-primary); font-size: .73rem; font-weight: 850; white-space: normal; }
+.control-command-guide span { color: var(--asisty-muted); font-size: .8rem; }
+.control-command-list > div { align-items: center; border-bottom: 1px solid var(--asisty-border); display: grid; gap: 8px; grid-template-columns: auto 120px minmax(0, 1fr); padding: 10px 0; }
+.control-command-list > div:last-child { border-bottom: 0; }
+.control-command-list strong { color: var(--asisty-text); font-size: .78rem; }
+.control-command-list p { color: var(--asisty-text); font-size: .8rem; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.control-command-list small { color: var(--asisty-muted); font-size: .7rem; grid-column: 3; }
+
 @media (max-width: 1050px) {
   .inbox-premium-layout { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); }
   .supervision-head-stats > * { min-width: 90px; }
   .task-list-panel .task-card { grid-template-columns: 1fr; }
+  .control-whatsapp-layout { grid-template-columns: 1fr; }
+  .control-whatsapp-form { position: static; }
 }
 
 @media (max-width: 760px) {
@@ -4086,4 +4112,8 @@ a {
   .task-advanced-filters > div { grid-template-columns: 1fr; }
   .task-advanced-filters .btn { width: 100%; }
   .task-list-head { align-items: flex-start; gap: 10px; }
+  .control-person-row { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
+  .control-person-actions { grid-column: 2; justify-content: flex-start; }
+  .control-command-guide > div:not(.panel-title), .control-command-list > div { grid-template-columns: 1fr; }
+  .control-command-list small { grid-column: auto; }
 }

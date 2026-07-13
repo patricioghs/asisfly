@@ -9,6 +9,7 @@ use App\Repositories\AiProviderRepository;
 use App\Repositories\OmnichannelRepository;
 use App\Repositories\TenantRepository;
 use App\Services\OpenAiClient;
+use App\Services\WhatsAppControlService;
 use App\Services\WhatsAppEmbeddedSignup;
 use Throwable;
 
@@ -107,6 +108,36 @@ final class IntegrationController extends Controller
             'users' => $repo->companyUsers($this->companyId()),
             'whatsappSignup' => (new WhatsAppEmbeddedSignup())->status(),
         ]);
+    }
+
+    public function whatsappControl(): void
+    {
+        $this->requirePermission('company.manage');
+        $control = new WhatsAppControlService();
+        $this->view('integrations/whatsapp_control', [
+            'title' => 'Control por WhatsApp',
+            'controllers' => $control->controllers($this->companyId()),
+            'users' => $control->users($this->companyId()),
+            'accounts' => $control->whatsappAccounts($this->companyId()),
+            'resources' => $control->resources($this->companyId()),
+            'commands' => $control->commands($this->companyId()),
+        ]);
+    }
+
+    public function saveWhatsAppController(): void
+    {
+        $this->requirePermission('company.manage');
+        $result = (new WhatsAppControlService())->saveController($this->companyId(), $_POST);
+        $_SESSION[!empty($result['ok']) ? 'flash_success' : 'flash_error'] = (string) $result['message'];
+        $this->redirect('/integrations/whatsapp-control');
+    }
+
+    public function disableWhatsAppController(): void
+    {
+        $this->requirePermission('company.manage');
+        (new WhatsAppControlService())->disableController($this->companyId(), (int) ($_POST['controller_id'] ?? 0));
+        $_SESSION['flash_success'] = 'Acceso por WhatsApp desactivado.';
+        $this->redirect('/integrations/whatsapp-control');
     }
 
     public function whatsappConnect(): void

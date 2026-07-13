@@ -187,6 +187,7 @@ $channelIcons = ['WhatsApp' => 'bi-whatsapp', 'Email' => 'bi-envelope-at', 'Inst
     <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-primary" href="<?= url('/integrations/accounts') ?>"><i class="bi bi-plug"></i> Gestionar cuentas</a>
         <a class="btn btn-outline-primary" href="<?= url('/integrations/whatsapp/connect') ?>"><i class="bi bi-whatsapp"></i> Conectar WhatsApp</a>
+        <?php if (in_array('*', $_SESSION['user']['permissions'] ?? [], true) || in_array('company.manage', $_SESSION['user']['permissions'] ?? [], true)): ?><a class="btn btn-outline-primary" href="<?= url('/integrations/whatsapp-control') ?>"><i class="bi bi-person-gear"></i> Personas autorizadas</a><?php endif; ?>
         <a class="btn btn-outline-secondary" href="<?= url('/inbox') ?>"><i class="bi bi-inboxes"></i> Ver mensajes</a>
     </div>
 </section>
