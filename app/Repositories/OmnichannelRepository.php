@@ -1093,7 +1093,7 @@ final class OmnichannelRepository
     {
         $autonomy = (new AutonomyRepository())->profile($companyId);
         $decision = $this->automationDecision($account, $message, $autonomy);
-        $commercial = (new OmnichannelCommercialAutomation())->handle($companyId, $account, $message, $decision);
+        $commercial = (new OmnichannelCommercialAutomation())->handle($companyId, $account, $message, $decision, $conversationId);
 
         if ($decision['mode'] === 'human_required') {
             Database::connection()->prepare('UPDATE inbox_conversations SET status = "open", assigned_to = :assigned_to, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')->execute([

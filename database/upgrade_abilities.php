@@ -31,6 +31,7 @@ try {
         __DIR__ . '/migrations/038_ai_brand_onboarding_answers.sql',
         __DIR__ . '/migrations/039_smart_booking_schema.sql',
         __DIR__ . '/migrations/040_email_sync_runs_schema.sql',
+        __DIR__ . '/migrations/041_task_source_links.sql',
     ] as $file) {
         $sql = file_get_contents($file);
         if ($sql === false) {

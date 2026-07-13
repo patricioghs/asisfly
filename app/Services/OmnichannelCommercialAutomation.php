@@ -10,7 +10,7 @@ use Throwable;
 
 final class OmnichannelCommercialAutomation
 {
-    public function handle(int $companyId, array $account, array $message, array $decision): array
+    public function handle(int $companyId, array $account, array $message, array $decision, int $conversationId = 0): array
     {
         if (!$this->ready()) {
             return ['ok' => false, 'reason' => 'CRM no disponible', 'actions' => []];
@@ -39,7 +39,7 @@ final class OmnichannelCommercialAutomation
             }
 
             if ($intent['task_type'] !== '') {
-                $taskId = $this->ensureTask($companyId, $customerId, $account, $message, $intent, $decision);
+                $taskId = $this->ensureTask($companyId, $customerId, $account, $message, $intent, $decision, $conversationId);
                 if ($taskId > 0) {
                     $actions[] = 'task_created';
                 }
@@ -137,7 +137,7 @@ final class OmnichannelCommercialAutomation
         return (int) Database::connection()->lastInsertId();
     }
 
-    private function ensureTask(int $companyId, int $customerId, array $account, array $message, array $intent, array $decision): int
+    private function ensureTask(int $companyId, int $customerId, array $account, array $message, array $intent, array $decision, int $conversationId): int
     {
         $title = $intent['task_title'];
         $dueAt = date('Y-m-d H:i:s', strtotime('+' . (int) $intent['task_hours'] . ' hours'));
@@ -148,12 +148,25 @@ final class OmnichannelCommercialAutomation
             'task_type' => $intent['task_type'],
             'title' => $title,
         ]);
-        if ((int) $statement->fetchColumn() > 0) {
+        $existingId = (int) $statement->fetchColumn();
+        if ($existingId > 0) {
+            if ($conversationId > 0) {
+                Database::connection()->prepare('UPDATE crm_tasks
+                    SET source_type = COALESCE(source_type, "omnichannel"),
+                        source_id = COALESCE(source_id, :source_id),
+                        source_label = COALESCE(source_label, :source_label)
+                    WHERE company_id = :company_id AND id = :id')->execute([
+                    'source_id' => $conversationId,
+                    'source_label' => $this->sourceLabel($account, $message),
+                    'company_id' => $companyId,
+                    'id' => $existingId,
+                ]);
+            }
             return 0;
         }
 
-        Database::connection()->prepare('INSERT INTO crm_tasks (company_id, customer_id, assigned_to, title, task_type, due_at, priority)
-            VALUES (:company_id, :customer_id, :assigned_to, :title, :task_type, :due_at, :priority)')->execute([
+        Database::connection()->prepare('INSERT INTO crm_tasks (company_id, customer_id, assigned_to, title, task_type, due_at, priority, source_type, source_id, source_label)
+            VALUES (:company_id, :customer_id, :assigned_to, :title, :task_type, :due_at, :priority, :source_type, :source_id, :source_label)')->execute([
             'company_id' => $companyId,
             'customer_id' => $customerId,
             'assigned_to' => !empty($account['assigned_user_id']) ? (int) $account['assigned_user_id'] : null,
@@ -161,9 +174,21 @@ final class OmnichannelCommercialAutomation
             'task_type' => $intent['task_type'],
             'due_at' => $dueAt,
             'priority' => $decision['risk'] === 'high' ? 'critical' : $intent['priority'],
+            'source_type' => $conversationId > 0 ? 'omnichannel' : null,
+            'source_id' => $conversationId > 0 ? $conversationId : null,
+            'source_label' => $conversationId > 0 ? $this->sourceLabel($account, $message) : null,
         ]);
 
         return (int) Database::connection()->lastInsertId();
+    }
+
+    private function sourceLabel(array $account, array $message): string
+    {
+        $channel = trim((string) ($account['channel'] ?? 'Omnicanal')) ?: 'Omnicanal';
+        $accountName = trim((string) ($account['display_name'] ?? $account['identifier'] ?? 'Cuenta conectada')) ?: 'Cuenta conectada';
+        $subject = trim((string) ($message['subject'] ?? ''));
+
+        return $channel . ' · ' . $accountName . ($subject !== '' ? ' · ' . mb_substr($subject, 0, 80) : '');
     }
 
     private function intent(array $message): array

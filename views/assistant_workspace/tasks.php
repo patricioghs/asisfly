@@ -10,6 +10,27 @@ foreach ($metrics as $metric) {
     $metricByStatus[$metric['status']] = (int) $metric['value'];
 }
 $quickTask = fn (array $extra): string => url('/tasks?' . http_build_query(array_filter([...$filters, ...$extra], fn ($value) => $value !== '')));
+$taskSource = static function (array $task): array {
+    if (($task['source_type'] ?? '') === 'omnichannel' && (int) ($task['source_id'] ?? 0) > 0) {
+        return [
+            'label' => (string) ($task['source_label'] ?? 'Conversacion omnicanal'),
+            'href' => url('/inbox?id=' . (int) $task['source_id']),
+            'action' => 'Abrir conversacion',
+            'icon' => 'bi-chat-dots',
+        ];
+    }
+
+    if (in_array($task['task_type'] ?? '', ['meeting', 'follow_up', 'quote', 'call', 'todo'], true) && !empty($task['customer_name'])) {
+        return [
+            'label' => 'Origen sin vinculo (tarea anterior)',
+            'href' => url('/inbox?q=' . rawurlencode((string) $task['customer_name'])),
+            'action' => 'Buscar conversacion',
+            'icon' => 'bi-search',
+        ];
+    }
+
+    return ['label' => 'Tarea creada manualmente', 'href' => '', 'action' => '', 'icon' => 'bi-list-check'];
+};
 ?>
 
 <section class="task-compact-head">
@@ -66,6 +87,7 @@ $quickTask = fn (array $extra): string => url('/tasks?' . http_build_query(array
     </div>
     <div class="task-board">
         <?php foreach ($tasks as $task): ?>
+            <?php $source = $taskSource($task); ?>
             <article class="task-card">
                 <div class="task-main">
                     <span class="account-icon"><i class="bi <?= e($typeIcons[$task['task_type'] ?? 'todo'] ?? 'bi-list-check') ?>"></i></span>
@@ -77,6 +99,10 @@ $quickTask = fn (array $extra): string => url('/tasks?' . http_build_query(array
                             <span class="priority priority-<?= e($task['priority'] ?? 'medium') ?>"><i class="bi <?= e($priorityIcons[$task['priority'] ?? 'medium'] ?? 'bi-dot') ?>"></i><?= e($priorityLabels[$task['priority'] ?? 'medium'] ?? 'Media') ?></span>
                             <span class="assignee-chip"><i class="bi bi-person"></i><?= e($task['assigned_name'] ?? 'Sin responsable') ?></span>
                             <span class="assignee-chip"><i class="bi bi-calendar3"></i><?= e($task['due_at'] ?? 'Sin fecha') ?></span>
+                        </div>
+                        <div class="task-origin">
+                            <span><i class="bi <?= e($source['icon']) ?>"></i><?= e($source['label']) ?></span>
+                            <?php if ($source['href'] !== ''): ?><a href="<?= e($source['href']) ?>"><?= e($source['action']) ?> <i class="bi bi-arrow-right"></i></a><?php endif; ?>
                         </div>
                     </div>
                 </div>

@@ -139,7 +139,8 @@ final class AssistantWorkspaceController extends Controller
             $params['q'] = '%' . $filters['q'] . '%';
         }
 
-        $sql = 'SELECT t.id, t.title, t.task_type, t.due_at, t.priority, t.status, t.assigned_to, t.completed_at, c.name AS customer_name, u.name AS assigned_name
+        $sql = 'SELECT t.id, t.title, t.task_type, t.due_at, t.priority, t.status, t.assigned_to, t.completed_at,
+                       t.source_type, t.source_id, t.source_label, c.name AS customer_name, u.name AS assigned_name
                 FROM crm_tasks t
                 LEFT JOIN crm_customers c ON c.id = t.customer_id AND c.company_id = t.company_id
                 LEFT JOIN users u ON u.id = t.assigned_to

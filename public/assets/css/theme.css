@@ -4048,6 +4048,10 @@ a {
 .task-list-panel .task-card { border: 0; border-bottom: 1px solid var(--asisty-border); border-radius: 0; gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(355px, .8fr); padding: 13px 16px; }
 .task-list-panel .task-card:last-child { border-bottom: 0; }
 .task-list-panel .task-main strong { font-size: .92rem; margin-bottom: 6px; }
+.task-origin { align-items: center; color: var(--asisty-muted); display: flex; flex-wrap: wrap; font-size: .73rem; gap: 7px 10px; margin-top: 8px; }
+.task-origin span { align-items: center; display: inline-flex; gap: 5px; }
+.task-origin a { color: var(--asisty-primary); font-weight: 850; text-decoration: none; }
+.task-origin a:hover { text-decoration: underline; }
 .task-list-panel .task-update-form { gap: 6px; }
 .task-list-panel .task-update-form .form-select, .task-list-panel .task-update-form .btn { font-size: .76rem; }
 .task-list-panel .task-collab { background: var(--asisty-surface-soft); display: block; padding: 0; }
