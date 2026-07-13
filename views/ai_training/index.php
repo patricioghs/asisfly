@@ -64,7 +64,7 @@ if (!isset($tabs[$section])) {
     $section = 'summary';
 }
 $activeTab = $tabs[$section];
-$scopedSections = ['summary', 'company', 'products', 'personality', 'rules', 'faqs', 'examples', 'simulator'];
+$scopedSections = ['summary', 'onboarding', 'company', 'products', 'personality', 'rules', 'faqs', 'examples', 'simulator'];
 $trainingSectionUrl = static function (string $key, ?int $brandRouteId = null) use (&$selectedBrandRouteId): string {
     $query = ['section' => $key];
     $targetBrandRouteId = $brandRouteId ?? $selectedBrandRouteId;
@@ -187,6 +187,7 @@ $progress = (int) ($session['progress_percent'] ?? 0);
                 <form id="question-<?= e($key) ?>" class="panel control-entry-form" method="post" action="<?= url('/ai-training/onboarding') ?>">
                     <?= csrf_field() ?>
                     <input type="hidden" name="question_key" value="<?= e($key) ?>">
+                    <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
                     <span class="eyebrow"><?= e((string) ($question['section'] ?? 'Entrevista')) ?><?= !empty($question['optional']) ? ' / opcional' : '' ?></span>
                     <h2><?= e((string) $question['label']) ?></h2>
                     <textarea class="form-control" name="answer" rows="4" placeholder="Escribe la respuesta de la empresa..."><?= e((string) $answer) ?></textarea>

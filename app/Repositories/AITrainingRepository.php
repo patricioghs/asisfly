@@ -19,6 +19,10 @@ final class AITrainingRepository
 
         $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
         $session = $this->session($companyId, 0);
+        if ($brandRouteId > 0) {
+            $session['progress_percent'] = $this->brandOnboardingProgress($companyId, $brandRouteId);
+            $session['current_step'] = $session['progress_percent'] >= 100 ? 'summary' : 'interview';
+        }
         $profile = $this->profile($companyId, false, $brandRouteId);
         $personality = $this->personality($companyId, false, $brandRouteId);
 
@@ -26,7 +30,7 @@ final class AITrainingRepository
             'session' => $session,
             'profile' => $profile,
             'personality' => $personality,
-            'answers' => $this->answers($companyId, (int) ($session['id'] ?? 0)),
+            'answers' => $this->answers($companyId, (int) ($session['id'] ?? 0), $brandRouteId),
             'metrics' => $this->metrics($companyId, $brandRouteId),
             'products' => $this->products($companyId, 8, $brandRouteId),
             'rules' => $this->rules($companyId, 8, $brandRouteId),
@@ -66,7 +70,7 @@ final class AITrainingRepository
         return $this->session($companyId, $userId);
     }
 
-    public function saveOnboardingAnswer(int $companyId, int $userId, string $questionKey, string $answer): void
+    public function saveOnboardingAnswer(int $companyId, int $userId, string $questionKey, string $answer, int $brandRouteId = 0): void
     {
         $this->ensureReady();
 
@@ -77,6 +81,27 @@ final class AITrainingRepository
 
         $session = $this->session($companyId, $userId);
         $question = $questions[$questionKey];
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
+
+        if ($brandRouteId > 0 && $this->brandOnboardingReady()) {
+            Database::connection()->prepare(
+                'INSERT INTO ai_brand_onboarding_answers (company_id, brand_route_id, question_key, question_label, answer, is_optional, answered_by, answered_at)
+                 VALUES (:company_id, :brand_route_id, :question_key, :question_label, :answer, :is_optional, :answered_by, CURRENT_TIMESTAMP)
+                 ON DUPLICATE KEY UPDATE answer = VALUES(answer), answered_by = VALUES(answered_by), answered_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP'
+            )->execute([
+                'company_id' => $companyId,
+                'brand_route_id' => $brandRouteId,
+                'question_key' => $questionKey,
+                'question_label' => $question['label'],
+                'answer' => trim($answer),
+                'is_optional' => !empty($question['optional']) ? 1 : 0,
+                'answered_by' => $userId ?: null,
+            ]);
+
+            $this->syncBrandProfileFromAnswers($companyId, $userId, $brandRouteId);
+            return;
+        }
+
         Database::connection()->prepare(
             'INSERT INTO ai_onboarding_answers (company_id, session_id, question_key, question_label, answer, is_optional, answered_by, answered_at)
              VALUES (:company_id, :session_id, :question_key, :question_label, :answer, :is_optional, :answered_by, CURRENT_TIMESTAMP)
@@ -548,6 +573,33 @@ final class AITrainingRepository
         ]);
     }
 
+    private function syncBrandProfileFromAnswers(int $companyId, int $userId, int $brandRouteId): void
+    {
+        $answers = $this->answers($companyId, 0, $brandRouteId);
+        $current = $this->profile($companyId, false, $brandRouteId);
+        $map = [];
+        foreach ($answers as $answer) {
+            $map[$answer['question_key']] = $answer['answer'];
+        }
+
+        $this->saveProfile($companyId, $userId, [
+            'brand_route_id' => $brandRouteId,
+            'status' => 'draft',
+            'company_name' => $map['company_name'] ?? ($current['company_name'] ?? ''),
+            'description' => $map['description'] ?? ($current['description'] ?? ''),
+            'industry' => $map['industry'] ?? ($current['industry'] ?? ''),
+            'main_offering' => $map['main_offering'] ?? ($current['main_offering'] ?? ''),
+            'customer_type' => $map['customer_type'] ?? ($current['customer_type'] ?? ''),
+            'value_proposition' => $map['value_proposition'] ?? ($current['value_proposition'] ?? ''),
+            'differentiators' => $map['differentiators'] ?? ($current['differentiators'] ?? ''),
+            'business_hours' => $map['business_hours'] ?? ($current['business_hours'] ?? ''),
+            'locations' => $map['locations'] ?? ($current['locations'] ?? ''),
+            'website' => $map['website'] ?? ($current['website'] ?? ''),
+            'contact_details' => $map['contact_details'] ?? ($current['contact_details'] ?? ''),
+            'primary_objective' => $map['ai_goal'] ?? ($current['primary_objective'] ?? ''),
+        ]);
+    }
+
     private function refreshSessionProgress(int $companyId, int $sessionId): void
     {
         $total = count(array_filter($this->questions(), fn (array $question): bool => empty($question['optional'])));
@@ -567,7 +619,9 @@ final class AITrainingRepository
     private function metrics(int $companyId, int $brandRouteId = 0): array
     {
         $session = $this->session($companyId, 0);
-        $answers = $this->scalar('SELECT COUNT(*) FROM ai_onboarding_answers WHERE company_id = :company_id AND session_id = :session_id AND answer IS NOT NULL AND answer <> ""', ['company_id' => $companyId, 'session_id' => (int) $session['id']]);
+        $answers = $brandRouteId > 0 && $this->brandOnboardingReady()
+            ? $this->scalar('SELECT COUNT(*) FROM ai_brand_onboarding_answers WHERE company_id = :company_id AND brand_route_id = :brand_route_id AND answer IS NOT NULL AND answer <> ""', ['company_id' => $companyId, 'brand_route_id' => $brandRouteId])
+            : $this->scalar('SELECT COUNT(*) FROM ai_onboarding_answers WHERE company_id = :company_id AND session_id = :session_id AND answer IS NOT NULL AND answer <> ""', ['company_id' => $companyId, 'session_id' => (int) $session['id']]);
         $products = $this->scopedCount('ai_products', 'product', $companyId, $brandRouteId, 'status = "active"');
         $rules = $this->scopedCount('ai_business_rules', 'rule', $companyId, $brandRouteId, 'status = "published" AND is_active = TRUE');
         $faqs = $this->scopedCount('ai_faqs', 'faq', $companyId, $brandRouteId, 'status = "published"');
@@ -596,8 +650,15 @@ final class AITrainingRepository
         ];
     }
 
-    private function answers(int $companyId, int $sessionId): array
+    private function answers(int $companyId, int $sessionId, int $brandRouteId = 0): array
     {
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
+        if ($brandRouteId > 0 && $this->brandOnboardingReady()) {
+            $statement = Database::connection()->prepare('SELECT * FROM ai_brand_onboarding_answers WHERE company_id = :company_id AND brand_route_id = :brand_route_id ORDER BY id');
+            $statement->execute(['company_id' => $companyId, 'brand_route_id' => $brandRouteId]);
+            return $statement->fetchAll(PDO::FETCH_ASSOC);
+        }
+
         if ($sessionId <= 0) {
             return [];
         }
@@ -605,6 +666,25 @@ final class AITrainingRepository
         $statement = Database::connection()->prepare('SELECT * FROM ai_onboarding_answers WHERE company_id = :company_id AND session_id = :session_id ORDER BY id');
         $statement->execute(['company_id' => $companyId, 'session_id' => $sessionId]);
         return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function brandOnboardingProgress(int $companyId, int $brandRouteId): int
+    {
+        if (!$this->brandOnboardingReady()) {
+            return 0;
+        }
+
+        $total = count(array_filter($this->questions(), fn (array $question): bool => empty($question['optional'])));
+        if ($total <= 0) {
+            return 0;
+        }
+
+        $answered = $this->scalar(
+            'SELECT COUNT(*) FROM ai_brand_onboarding_answers WHERE company_id = :company_id AND brand_route_id = :brand_route_id AND is_optional = FALSE AND answer IS NOT NULL AND answer <> ""',
+            ['company_id' => $companyId, 'brand_route_id' => $brandRouteId]
+        );
+
+        return min(100, (int) floor(($answered / $total) * 100));
     }
 
     private function profile(int $companyId, bool $publishedOnly = false, int $brandRouteId = 0): array
@@ -991,6 +1071,16 @@ final class AITrainingRepository
             Database::connection()->query('SELECT 1 FROM ai_brand_profiles LIMIT 1');
             Database::connection()->query('SELECT 1 FROM ai_brand_personalities LIMIT 1');
             Database::connection()->query('SELECT 1 FROM ai_training_brand_scopes LIMIT 1');
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function brandOnboardingReady(): bool
+    {
+        try {
+            Database::connection()->query('SELECT 1 FROM ai_brand_onboarding_answers LIMIT 1');
             return true;
         } catch (Throwable) {
             return false;

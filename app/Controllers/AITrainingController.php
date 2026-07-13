@@ -137,10 +137,10 @@ final class AITrainingController extends Controller
         }
 
         $this->runTrainingAction(
-            fn (): mixed => (new AITrainingRepository())->saveOnboardingAnswer($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $questionKey, $answer),
+            fn (): mixed => (new AITrainingRepository())->saveOnboardingAnswer($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $questionKey, $answer, (int) ($_POST['brand_route_id'] ?? 0)),
             'Respuesta guardada. Puedes continuar cuando quieras.'
         );
-        $this->redirect($this->sectionUrl('onboarding') . '#question-' . rawurlencode($questionKey));
+        $this->redirect($this->sectionUrl('onboarding', (int) ($_POST['brand_route_id'] ?? 0)) . '#question-' . rawurlencode($questionKey));
     }
 
     public function saveProfile(): void
