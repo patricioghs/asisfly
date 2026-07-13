@@ -111,10 +111,10 @@ final class InboxRepository
         return $conversation;
     }
 
-    public function updateStatus(int $companyId, int $conversationId, string $status): void
+    public function updateStatus(int $companyId, int $conversationId, string $status): int
     {
         if (!$this->databaseReady() || $conversationId <= 0 || !in_array($status, ['new', 'open', 'pending_approval', 'answered', 'closed'], true)) {
-            return;
+            return 0;
         }
 
         Database::connection()->prepare('UPDATE inbox_conversations SET status = :status WHERE company_id = :company_id AND id = :id')->execute([
@@ -122,6 +122,46 @@ final class InboxRepository
             'company_id' => $companyId,
             'id' => $conversationId,
         ]);
+
+        return $status === 'closed' ? $this->cancelPendingTasksForConversation($companyId, $conversationId) : 0;
+    }
+
+    private function cancelPendingTasksForConversation(int $companyId, int $conversationId): int
+    {
+        try {
+            $tasks = Database::connection()->prepare(
+                'SELECT id FROM crm_tasks
+                 WHERE company_id = :company_id AND source_type = "omnichannel" AND source_id = :conversation_id AND status = "pending"'
+            );
+            $tasks->execute(['company_id' => $companyId, 'conversation_id' => $conversationId]);
+            $taskIds = array_map('intval', $tasks->fetchAll(PDO::FETCH_COLUMN));
+            if (!$taskIds) {
+                return 0;
+            }
+
+            Database::connection()->prepare(
+                'UPDATE crm_tasks
+                 SET status = "cancelled", completed_at = CURRENT_TIMESTAMP
+                 WHERE company_id = :company_id AND source_type = "omnichannel" AND source_id = :conversation_id AND status = "pending"'
+            )->execute(['company_id' => $companyId, 'conversation_id' => $conversationId]);
+
+            try {
+                $event = Database::connection()->prepare(
+                    'INSERT INTO crm_task_events (company_id, task_id, user_id, event_type, summary, metadata_json)
+                     VALUES (:company_id, :task_id, NULL, "conversation_closed", "Tarea cancelada al cerrar la conversacion de origen.", JSON_OBJECT("conversation_id", :conversation_id))'
+                );
+                foreach ($taskIds as $taskId) {
+                    $event->execute(['company_id' => $companyId, 'task_id' => $taskId, 'conversation_id' => $conversationId]);
+                }
+            } catch (\Throwable) {
+                // El historial es opcional: la sincronizacion de estado no debe bloquearse.
+            }
+
+            return count($taskIds);
+        } catch (\Throwable) {
+            // La columna de origen puede no existir durante un despliegue incompleto.
+            return 0;
+        }
     }
 
     public function metrics(int $companyId): array

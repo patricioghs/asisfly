@@ -73,7 +73,13 @@ final class InboxController extends Controller
     {
         $this->requirePermission('chat.use');
         $conversationId = (int) ($_POST['conversation_id'] ?? 0);
-        (new InboxRepository())->updateStatus($this->companyId(), $conversationId, (string) ($_POST['status'] ?? ''));
+        $status = (string) ($_POST['status'] ?? '');
+        $cancelledTasks = (new InboxRepository())->updateStatus($this->companyId(), $conversationId, $status);
+        if ($status === 'closed') {
+            $_SESSION['flash_success'] = $cancelledTasks > 0
+                ? 'Conversacion cerrada. Se cancelaron ' . $cancelledTasks . ' tarea(s) vinculada(s).'
+                : 'Conversacion cerrada. No habia tareas pendientes vinculadas.';
+        }
         $this->redirect('/inbox?id=' . $conversationId);
     }
 
