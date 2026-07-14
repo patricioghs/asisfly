@@ -43,7 +43,7 @@ foreach (($metrics ?? []) as $metric) {
     $metricMap[$metric['label']] = $metric['value'];
 }
 ?>
-<div class="supervision-compact-head">
+<div class="supervision-compact-head" hidden>
     <div>
         <span class="eyebrow">Centro de conversaciones IA</span>
         <h2>Centro de Supervision</h2>
@@ -56,7 +56,7 @@ foreach (($metrics ?? []) as $metric) {
     </div>
 </div>
 
-<details class="panel supervision-insights mt-3">
+<details class="panel supervision-insights mt-3" hidden>
     <summary><span><i class="bi bi-bar-chart-line"></i> Resumen de autonomia y auditoria</span><i class="bi bi-chevron-down"></i></summary>
     <div class="supervision-insights-body">
         <a class="soft-badge" href="<?= url('/ai-training?section=settings') ?>">Ajustar autonomia <i class="bi bi-arrow-right"></i></a>
