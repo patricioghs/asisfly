@@ -74,7 +74,6 @@ final class AbilityRegistry
                 ['/automations', 'Automatizaciones', 'bi-magic', null],
                 ['/actions', 'Aprobaciones', 'bi-check2-square', null],
                 ['/controls', 'Controles', 'bi-sliders', null],
-                ['/documents', 'Memoria', 'bi-database-check', null],
                 ['/assistant', 'Reglas', 'bi-sliders2', null],
             ],
             'Comunicacion' => [
