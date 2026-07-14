@@ -361,6 +361,9 @@ final class OmnichannelRepository
                 'ok' => true,
                 'message' => "Sincronizacion completada. Revisados: " . count($uids) . ". Correos nuevos: {$imported}. Ya importados: {$duplicates}. Con error: {$failed}." . ($lastError ? ' Ultimo aviso: ' . $lastError : ''),
                 'imported' => $imported,
+                'reviewed' => count($uids),
+                'duplicates' => $duplicates,
+                'failed' => $failed,
             ];
         } catch (\Throwable $exception) {
             return ['ok' => false, 'message' => 'No se pudo sincronizar IMAP: ' . $exception->getMessage(), 'imported' => 0];
@@ -368,6 +371,62 @@ final class OmnichannelRepository
             if (is_resource($mailbox) || (class_exists('\\IMAP\\Connection') && $mailbox instanceof \IMAP\Connection)) {
                 imap_close($mailbox);
             }
+        }
+    }
+
+    public function syncEmailAccounts(int $companyId, int $limit = 15): array
+    {
+        if ($companyId <= 0) {
+            return ['ok' => false, 'message' => 'Empresa no valida.'];
+        }
+
+        try {
+            $accounts = Database::connection()->prepare(
+                'SELECT id, display_name
+                 FROM omnichannel_accounts
+                 WHERE company_id = :company_id
+                   AND channel = "Email"
+                   AND provider IN ("imap", "gmail", "outlook")
+                   AND inbound_enabled = TRUE
+                   AND status = "connected"
+                   AND encrypted_credentials IS NOT NULL
+                 ORDER BY id'
+            );
+            $accounts->execute(['company_id' => $companyId]);
+            $accounts = $accounts->fetchAll(PDO::FETCH_ASSOC);
+            if (!$accounts) {
+                return ['ok' => false, 'message' => 'No hay cuentas de correo conectadas y habilitadas para sincronizar.'];
+            }
+
+            $reviewed = 0;
+            $imported = 0;
+            $duplicates = 0;
+            $failed = 0;
+            $warnings = [];
+            foreach ($accounts as $account) {
+                $result = $this->syncEmailAccount($companyId, (int) $account['id'], $limit);
+                $reviewed += (int) ($result['reviewed'] ?? 0);
+                $imported += (int) ($result['imported'] ?? 0);
+                $duplicates += (int) ($result['duplicates'] ?? 0);
+                $failed += (int) ($result['failed'] ?? 0);
+                if (empty($result['ok'])) {
+                    $failed++;
+                    $warnings[] = (string) $account['display_name'] . ': ' . (string) ($result['message'] ?? 'sin detalle');
+                }
+            }
+
+            $message = 'Sincronizacion de todas las cuentas finalizada. Cuentas: ' . count($accounts)
+                . '. Revisados: ' . $reviewed
+                . '. Correos nuevos: ' . $imported
+                . '. Ya importados: ' . $duplicates
+                . '. Con error: ' . $failed . '.';
+            if ($warnings) {
+                $message .= ' Aviso: ' . implode(' | ', array_slice($warnings, 0, 2));
+            }
+
+            return ['ok' => $failed === 0, 'message' => $message, 'imported' => $imported];
+        } catch (\Throwable $exception) {
+            return ['ok' => false, 'message' => 'No se pudieron sincronizar las cuentas: ' . $exception->getMessage(), 'imported' => 0];
         }
     }
 

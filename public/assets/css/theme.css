@@ -4097,6 +4097,9 @@ a {
 .inbox-premium-layout .supervision-list { align-content: start; display: grid; gap: 0; grid-template-rows: auto auto auto minmax(0, 1fr); overflow: hidden; padding: 0; }
 .inbox-list-head { align-items: center; border-bottom: 1px solid var(--asisty-border); display: flex; justify-content: space-between; padding: 17px 18px 12px; }
 .inbox-list-head h3 { color: var(--asisty-text); font-family: var(--font-display, inherit); font-size: 1rem; font-weight: 900; margin: 2px 0 0; }
+.inbox-list-actions { align-items: center; display: flex; gap: 8px; }
+.inbox-list-actions form { margin: 0; }
+.inbox-list-actions .icon-button { align-items: center; display: inline-flex; height: 34px; justify-content: center; min-width: 34px; padding: 0; }
 .inbox-compact-filter { border-bottom: 1px solid var(--asisty-border); display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto auto; padding: 12px 14px; }
 .inbox-compact-filter .form-control { min-width: 0; }
 .inbox-compact-filter .icon-button { align-items: center; display: inline-flex; justify-content: center; min-width: 38px; padding: 0; }

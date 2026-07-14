@@ -288,4 +288,18 @@ final class IntegrationController extends Controller
 
         $this->redirect('/integrations/accounts');
     }
+
+    public function syncAllEmailAccounts(): void
+    {
+        $this->requireAuth();
+
+        try {
+            $result = (new OmnichannelRepository())->syncEmailAccounts($this->companyId());
+            $_SESSION[!empty($result['ok']) ? 'flash_success' : 'flash_error'] = (string) ($result['message'] ?? 'No se pudo completar la sincronizacion.');
+        } catch (Throwable $exception) {
+            $_SESSION['flash_error'] = 'No se pudieron sincronizar las cuentas: ' . $exception->getMessage();
+        }
+
+        $this->redirect('/inbox');
+    }
 }

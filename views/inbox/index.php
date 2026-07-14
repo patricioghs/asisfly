@@ -110,7 +110,16 @@ foreach (($metrics ?? []) as $metric) {
 
 <div class="inbox-layout inbox-premium-layout mt-3">
     <aside class="panel inbox-list supervision-list">
-        <div class="inbox-list-head"><div><span class="eyebrow">Supervision</span><h3>Conversaciones</h3></div><span class="soft-badge"><?= e((string) count($conversations)) ?></span></div>
+        <div class="inbox-list-head">
+            <div><span class="eyebrow">Supervision</span><h3>Conversaciones</h3></div>
+            <div class="inbox-list-actions">
+                <span class="soft-badge"><?= e((string) count($conversations)) ?></span>
+                <form method="post" action="<?= url('/integrations/accounts/sync-all-email') ?>">
+                    <?= csrf_field() ?>
+                    <button class="btn btn-outline-primary icon-button" title="Sincronizar todas las cuentas de correo" aria-label="Sincronizar todas las cuentas de correo"><i class="bi bi-arrow-repeat"></i></button>
+                </form>
+            </div>
+        </div>
         <form class="inbox-compact-filter" method="get" action="<?= url('/inbox') ?>">
             <input class="form-control" name="q" value="<?= e($filters['q'] ?? '') ?>" placeholder="Buscar cliente, asunto o motivo">
             <button class="btn btn-primary icon-button" title="Buscar" aria-label="Buscar"><i class="bi bi-search"></i></button>

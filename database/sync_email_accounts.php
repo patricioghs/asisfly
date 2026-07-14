@@ -8,7 +8,7 @@ use App\Core\Database;
 use App\Repositories\OmnichannelRepository;
 
 /**
- * Sincroniza cuentas IMAP conectadas. Pensado para cron cada 10 minutos.
+ * Sincroniza cuentas IMAP conectadas. Pensado para cron cada 5 minutos.
  * No recibe ni imprime credenciales; el repositorio las descifra solo en memoria.
  */
 function option(string $name, int $default = 0): int
