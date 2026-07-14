@@ -178,29 +178,31 @@ foreach (($metrics ?? []) as $metric) {
             <a class="<?= !empty($filters['intervention']) ? 'active' : '' ?>" href="<?= e($quickFilter(['intervention' => '1', 'ai_state' => ''])) ?>">Mi intervencion</a>
         </div>
 
-        <div class="supervision-section-label">Ordenadas por prioridad</div>
-        <?php foreach ($conversations as $conversation): ?>
-            <a class="inbox-row supervision-row <?= $selected && (int) $selected['id'] === (int) $conversation['id'] ? 'active' : '' ?>" href="<?= url('/inbox?id=' . (int) $conversation['id'] . ($filterQuery ? '&' . $filterQuery : '')) ?>">
-                <div class="supervision-row-head">
-                    <strong><?= e($conversation['customer_name']) ?></strong>
-                    <span><i class="bi <?= e($channelIcons[$conversation['channel']] ?? 'bi-inbox') ?>"></i><?= e($conversation['account_name'] ?: $conversation['channel']) ?></span>
+        <div class="supervision-conversation-list">
+            <div class="supervision-section-label">Ordenadas por prioridad</div>
+            <?php foreach ($conversations as $conversation): ?>
+                <a class="inbox-row supervision-row <?= $selected && (int) $selected['id'] === (int) $conversation['id'] ? 'active' : '' ?>" href="<?= url('/inbox?id=' . (int) $conversation['id'] . ($filterQuery ? '&' . $filterQuery : '')) ?>">
+                    <div class="supervision-row-head">
+                        <strong><?= e($conversation['customer_name']) ?></strong>
+                        <span><i class="bi <?= e($channelIcons[$conversation['channel']] ?? 'bi-inbox') ?>"></i><?= e($conversation['account_name'] ?: $conversation['channel']) ?></span>
+                    </div>
+                    <p><?= e($conversation['subject']) ?></p>
+                    <small>
+                        <span class="ai-state-pill state-<?= e($conversation['ai_state'] ?? 'human_required') ?>"><i class="bi bi-cpu"></i><?= e($conversation['ai_state_label'] ?? 'Requiere supervision') ?></span>
+                        <?php if (!empty($conversation['brand_detection']['brand_name'])): ?>
+                            <span class="assignee-chip"><i class="bi bi-signpost-split"></i><?= e($conversation['brand_detection']['brand_name']) ?></span>
+                        <?php endif; ?>
+                    </small>
+                    <em><?= e($conversation['last_message'] ?? $conversation['ai_activity'] ?? 'AsisFly reviso la conversacion') ?></em>
+                </a>
+            <?php endforeach; ?>
+            <?php if (!$conversations): ?>
+                <div class="empty-state compact">
+                    <strong>Sin conversaciones para supervisar</strong>
+                    <p>Cuando AsisFly necesite aprobacion o apoyo humano, aparecera aqui.</p>
                 </div>
-                <p><?= e($conversation['subject']) ?></p>
-                <small>
-                    <span class="ai-state-pill state-<?= e($conversation['ai_state'] ?? 'human_required') ?>"><i class="bi bi-cpu"></i><?= e($conversation['ai_state_label'] ?? 'Requiere supervision') ?></span>
-                    <?php if (!empty($conversation['brand_detection']['brand_name'])): ?>
-                        <span class="assignee-chip"><i class="bi bi-signpost-split"></i><?= e($conversation['brand_detection']['brand_name']) ?></span>
-                    <?php endif; ?>
-                </small>
-                <em><?= e($conversation['last_message'] ?? $conversation['ai_activity'] ?? 'AsisFly reviso la conversacion') ?></em>
-            </a>
-        <?php endforeach; ?>
-        <?php if (!$conversations): ?>
-            <div class="empty-state compact">
-                <strong>Sin conversaciones para supervisar</strong>
-                <p>Cuando AsisFly necesite aprobacion o apoyo humano, aparecera aqui.</p>
-            </div>
-        <?php endif; ?>
+            <?php endif; ?>
+        </div>
     </aside>
 
     <section class="panel inbox-detail supervision-detail">
