@@ -252,19 +252,31 @@ final class InboxRepository
             return;
         }
 
-        $statement = Database::connection()->prepare('INSERT INTO inbox_messages (company_id, account_id, conversation_id, provider, direction, sender_name, body, ai_generated, status) VALUES (:company_id, :account_id, :conversation_id, :provider, :direction, :sender_name, :body, :ai_generated, :status)');
-        $statement->execute([
-            'company_id' => $companyId,
-            'account_id' => $conversation['account_id'] ?? null,
-            'conversation_id' => $conversationId,
-            'provider' => $conversation['provider'] ?? null,
-            'direction' => 'outbound',
-            'sender_name' => 'AsisFly',
-            'body' => $reply,
-            'ai_generated' => 1,
-            'status' => 'draft',
-        ]);
-        $draftId = (int) Database::connection()->lastInsertId();
+        $existingDraft = Database::connection()->prepare('SELECT id FROM inbox_messages WHERE company_id = :company_id AND conversation_id = :conversation_id AND direction = "outbound" AND ai_generated = 1 AND status IN ("draft", "approved", "failed") ORDER BY id DESC LIMIT 1');
+        $existingDraft->execute(['company_id' => $companyId, 'conversation_id' => $conversationId]);
+        $draftId = (int) $existingDraft->fetchColumn();
+
+        if ($draftId > 0) {
+            Database::connection()->prepare('UPDATE inbox_messages SET body = :body, sender_name = "AsisFly", status = "draft" WHERE company_id = :company_id AND id = :id')->execute([
+                'body' => $reply,
+                'company_id' => $companyId,
+                'id' => $draftId,
+            ]);
+        } else {
+            $statement = Database::connection()->prepare('INSERT INTO inbox_messages (company_id, account_id, conversation_id, provider, direction, sender_name, body, ai_generated, status) VALUES (:company_id, :account_id, :conversation_id, :provider, :direction, :sender_name, :body, :ai_generated, :status)');
+            $statement->execute([
+                'company_id' => $companyId,
+                'account_id' => $conversation['account_id'] ?? null,
+                'conversation_id' => $conversationId,
+                'provider' => $conversation['provider'] ?? null,
+                'direction' => 'outbound',
+                'sender_name' => 'AsisFly',
+                'body' => $reply,
+                'ai_generated' => 1,
+                'status' => 'draft',
+            ]);
+            $draftId = (int) Database::connection()->lastInsertId();
+        }
 
         if (!empty($draftTrace)) {
             $this->logTrainingTrace($companyId, $conversationId, $conversation, $draftTrace, $draftId);
@@ -275,17 +287,19 @@ final class InboxRepository
             'id' => $conversationId,
         ]);
 
-        (new ActionRepository())->create($companyId, $userId, [
-            'title' => 'Aprobar respuesta omnicanal',
-            'description' => 'AsisFly redacto una respuesta para ' . $conversation['customer_name'] . ' en ' . ($conversation['account_name'] ?: $conversation['channel']) . '.',
-            'module' => 'Bandeja Omnicanal',
-            'brain' => 'Cerebro Comercial',
-            'action_type' => 'send_omnichannel_reply',
-            'priority' => $conversation['priority'],
-            'risk_level' => 'medium',
-            'payload' => ['conversation_id' => $conversationId, 'account_id' => $conversation['account_id'] ?? null, 'account' => $conversation['account_name'] ?? null, 'channel' => $conversation['channel'], 'reply' => $reply],
-            'requires_approval' => true,
-        ]);
+        if ($draftId > 0 && !$this->hasPendingReplyApproval($companyId, $conversationId)) {
+            (new ActionRepository())->create($companyId, $userId, [
+                'title' => 'Aprobar respuesta omnicanal',
+                'description' => 'AsisFly redacto una respuesta para ' . $conversation['customer_name'] . ' en ' . ($conversation['account_name'] ?: $conversation['channel']) . '.',
+                'module' => 'Bandeja Omnicanal',
+                'brain' => 'Cerebro Comercial',
+                'action_type' => 'send_omnichannel_reply',
+                'priority' => $conversation['priority'],
+                'risk_level' => 'medium',
+                'payload' => ['conversation_id' => $conversationId, 'account_id' => $conversation['account_id'] ?? null, 'account' => $conversation['account_name'] ?? null, 'channel' => $conversation['channel'], 'reply' => $reply],
+                'requires_approval' => true,
+            ]);
+        }
     }
 
     public function saveDraft(int $companyId, int $conversationId, int $userId, string $userName, string $body): void
@@ -469,6 +483,29 @@ final class InboxRepository
         $statement->execute(['company_id' => $companyId, 'conversation_id' => $conversationId]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
+    }
+
+    private function hasPendingReplyApproval(int $companyId, int $conversationId): bool
+    {
+        try {
+            $statement = Database::connection()->prepare(
+                'SELECT id FROM action_center_items
+                 WHERE company_id = :company_id
+                   AND action_type = "send_omnichannel_reply"
+                   AND status IN ("pending", "approved")
+                   AND JSON_UNQUOTE(JSON_EXTRACT(payload_json, "$.conversation_id")) = :conversation_id
+                 LIMIT 1'
+            );
+            $statement->execute([
+                'company_id' => $companyId,
+                'conversation_id' => (string) $conversationId,
+            ]);
+
+            return (bool) $statement->fetchColumn();
+        } catch (\Throwable) {
+            // A missing optional audit table must not prevent a response draft.
+            return false;
+        }
     }
 
     private function decorateConversation(array $conversation): array

@@ -24,6 +24,11 @@ $routingStatusOptions = [
     'unrouted' => 'Sin marca',
 ];
 $latestDraft = $selected['latest_draft'] ?? null;
+$latestDraftId = (int) ($latestDraft['id'] ?? 0);
+$threadMessages = array_values(array_filter((array) ($selected['messages'] ?? []), static function (array $message) use ($latestDraftId): bool {
+    // A pending draft is edited in the response workspace below, not duplicated in the timeline.
+    return $latestDraftId <= 0 || (int) ($message['id'] ?? 0) !== $latestDraftId;
+}));
 $supervisionReport = $supervisionReport ?? ['decisionCounts' => [], 'generatedCounts' => [], 'channels' => [], 'recentContexts' => []];
 $decisionCounts = $supervisionReport['decisionCounts'] ?? [];
 $generatedCounts = $supervisionReport['generatedCounts'] ?? [];
@@ -338,7 +343,7 @@ foreach (($metrics ?? []) as $metric) {
             </form>
 
             <div class="inbox-thread supervision-thread">
-                <?php foreach ($selected['messages'] as $message): ?>
+                <?php foreach ($threadMessages as $message): ?>
                     <?php
                         $formattedBody = \App\Services\EmailBodyFormatter::formatEmailBody((string) ($message['body'] ?? ''));
                         $recipientLabel = ($message['direction'] ?? '') === 'outbound'
@@ -404,8 +409,8 @@ foreach (($metrics ?? []) as $metric) {
                 <form method="post" action="<?= url('/inbox/suggest') ?>" class="reply-action-row">
                     <?= csrf_field() ?>
                     <input type="hidden" name="conversation_id" value="<?= e((string) $selected['id']) ?>">
-                    <button class="btn btn-primary"><i class="bi bi-stars"></i> Sugerir con IA</button>
-                    <span>AsisFly redacta una respuesta editable y aprende de tus cambios.</span>
+                    <button class="btn btn-primary"><i class="bi <?= $latestDraft ? 'bi-arrow-repeat' : 'bi-stars' ?>"></i> <?= $latestDraft ? 'Regenerar con IA' : 'Generar con IA' ?></button>
+                    <span><?= $latestDraft ? 'Solo genera una nueva propuesta si la actual no te sirve.' : 'AsisFly redacta una respuesta editable y aprende de tus cambios.' ?></span>
                 </form>
                 <form method="post" action="<?= url('/inbox/draft') ?>" class="reply-editor-form">
                     <?= csrf_field() ?>
