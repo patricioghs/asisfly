@@ -51,6 +51,147 @@ final class AITrainingRepository
         ];
     }
 
+    public function storeQuickStartDraft(int $companyId, int $userId, int $brandRouteId, string $sourceText, array $analysis, string $source, ?string $error = null): array
+    {
+        $this->ensureReady();
+        if (!$this->quickStartReady()) {
+            throw new RuntimeException('El inicio rápido de entrenamiento aún no está instalado. Ejecuta database/upgrade_abilities.php.');
+        }
+
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
+        $statement = Database::connection()->prepare(
+            'INSERT INTO ai_training_quick_starts (company_id, brand_route_id, created_by, source_text, analysis_json, source, status, error_message)
+             VALUES (:company_id, :brand_route_id, :created_by, :source_text, :analysis_json, :source, "draft", :error_message)'
+        );
+        $statement->execute([
+            'company_id' => $companyId,
+            'brand_route_id' => $brandRouteId > 0 ? $brandRouteId : null,
+            'created_by' => $userId ?: null,
+            'source_text' => substr(trim($sourceText), 0, 30000),
+            'analysis_json' => json_encode($analysis, JSON_UNESCAPED_UNICODE),
+            'source' => $source === 'openai' ? 'openai' : 'fallback',
+            'error_message' => $error !== null ? substr($error, 0, 2000) : null,
+        ]);
+
+        return $this->quickStartDraft($companyId, (int) Database::connection()->lastInsertId(), $brandRouteId) ?? [];
+    }
+
+    public function quickStartDraft(int $companyId, int $draftId = 0, int $brandRouteId = 0): ?array
+    {
+        if (!$this->quickStartReady()) {
+            return null;
+        }
+
+        $brandRouteId = $this->validBrandRouteId($companyId, $brandRouteId);
+        $sql = 'SELECT * FROM ai_training_quick_starts WHERE company_id = :company_id';
+        $params = ['company_id' => $companyId];
+        if ($draftId > 0) {
+            $sql .= ' AND id = :id';
+            $params['id'] = $draftId;
+        } else {
+            $sql .= ' AND brand_route_id <=> :brand_route_id';
+            $params['brand_route_id'] = $brandRouteId > 0 ? $brandRouteId : null;
+        }
+        $sql .= ' ORDER BY id DESC LIMIT 1';
+        $statement = Database::connection()->prepare($sql);
+        $statement->execute($params);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+
+        $row['analysis'] = json_decode((string) ($row['analysis_json'] ?? ''), true) ?: [];
+        return $row;
+    }
+
+    public function applyQuickStartDraft(int $companyId, int $userId, int $draftId): array
+    {
+        $this->ensureReady();
+        $draft = $this->quickStartDraft($companyId, $draftId);
+        if (!$draft) {
+            throw new RuntimeException('No se encontró el borrador de inicio rápido para esta empresa.');
+        }
+        if (($draft['status'] ?? '') !== 'draft') {
+            throw new RuntimeException('Este borrador ya fue aplicado o no está disponible.');
+        }
+
+        $analysis = is_array($draft['analysis'] ?? null) ? $draft['analysis'] : [];
+        if (!$analysis) {
+            throw new RuntimeException('El borrador no contiene datos utilizables.');
+        }
+
+        $brandRouteId = (int) ($draft['brand_route_id'] ?? 0);
+        $pdo = Database::connection();
+        $counts = ['products' => 0, 'rules' => 0, 'faqs' => 0];
+        $pdo->beginTransaction();
+        try {
+            $this->saveProfile($companyId, $userId, [
+                ...((array) ($analysis['profile'] ?? [])),
+                'brand_route_id' => $brandRouteId,
+                'status' => 'published',
+            ]);
+            $this->savePersonality($companyId, $userId, [
+                ...((array) ($analysis['personality'] ?? [])),
+                'brand_route_id' => $brandRouteId,
+                'status' => 'published',
+            ]);
+
+            foreach (array_slice((array) ($analysis['products'] ?? []), 0, 5) as $product) {
+                if (!is_array($product) || trim((string) ($product['name'] ?? '')) === '') {
+                    continue;
+                }
+                $this->addProduct($companyId, $userId, [
+                    ...$product,
+                    'brand_route_id' => $brandRouteId,
+                    'item_type' => in_array(($product['item_type'] ?? ''), ['product', 'service'], true) ? $product['item_type'] : 'service',
+                    'price_type' => in_array(($product['price_type'] ?? ''), ['fixed', 'range', 'quote_required'], true) ? $product['price_type'] : 'quote_required',
+                    'status' => 'active',
+                ]);
+                $counts['products']++;
+            }
+            foreach (array_slice((array) ($analysis['rules'] ?? []), 0, 5) as $rule) {
+                if (!is_array($rule) || trim((string) ($rule['name'] ?? '')) === '') {
+                    continue;
+                }
+                $this->addRule($companyId, $userId, [
+                    ...$rule,
+                    'brand_route_id' => $brandRouteId,
+                    'priority' => in_array(($rule['priority'] ?? ''), ['low', 'medium', 'high', 'critical'], true) ? $rule['priority'] : 'medium',
+                    'channel' => $rule['channel'] ?? 'all',
+                    'status' => 'published',
+                    'is_active' => 1,
+                ]);
+                $counts['rules']++;
+            }
+            foreach (array_slice((array) ($analysis['faqs'] ?? []), 0, 5) as $faq) {
+                if (!is_array($faq) || trim((string) ($faq['question'] ?? '')) === '' || trim((string) ($faq['approved_answer'] ?? '')) === '') {
+                    continue;
+                }
+                $this->addFaq($companyId, $userId, [
+                    ...$faq,
+                    'brand_route_id' => $brandRouteId,
+                    'channel' => $faq['channel'] ?? 'all',
+                    'priority' => in_array(($faq['priority'] ?? ''), ['low', 'medium', 'high', 'critical'], true) ? $faq['priority'] : 'medium',
+                    'source' => 'Inicio rápido IA',
+                    'status' => 'published',
+                ]);
+                $counts['faqs']++;
+            }
+
+            $this->publishProfile($companyId, $userId, $brandRouteId);
+            $pdo->prepare('UPDATE ai_training_quick_starts SET status = "applied", applied_at = CURRENT_TIMESTAMP WHERE id = :id AND company_id = :company_id')
+                ->execute(['id' => $draftId, 'company_id' => $companyId]);
+            $pdo->commit();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
+
+        return $counts;
+    }
+
     public function session(int $companyId, int $userId): array
     {
         if (!$this->ready()) {
@@ -1034,6 +1175,16 @@ final class AITrainingRepository
             foreach (['ai_company_profiles', 'ai_onboarding_sessions', 'ai_personalities', 'ai_business_rules', 'ai_products', 'ai_faqs', 'ai_conversation_examples'] as $table) {
                 Database::connection()->query('SELECT 1 FROM ' . $table . ' LIMIT 1');
             }
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function quickStartReady(): bool
+    {
+        try {
+            Database::connection()->query('SELECT 1 FROM ai_training_quick_starts LIMIT 1');
             return true;
         } catch (Throwable) {
             return false;

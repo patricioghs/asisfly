@@ -44,7 +44,9 @@ $routingSettings = $overview['routingSettings'] ?? [
 $questions = $questions ?? [];
 $answersByKey = $answersByKey ?? [];
 $simulation = $simulation ?? null;
+$quickStartDraft = $quickStartDraft ?? null;
 $tabs = [
+    'quick-start' => ['Inicio rapido', 'bi-lightning-charge'],
     'summary' => ['Resumen', 'bi-speedometer2'],
     'onboarding' => ['Entrevista inicial', 'bi-chat-dots'],
     'company' => ['Empresa', 'bi-building'],
@@ -64,7 +66,7 @@ if (!isset($tabs[$section])) {
     $section = 'summary';
 }
 $activeTab = $tabs[$section];
-$scopedSections = ['summary', 'onboarding', 'company', 'products', 'personality', 'rules', 'faqs', 'examples', 'simulator'];
+$scopedSections = ['quick-start', 'summary', 'onboarding', 'company', 'products', 'personality', 'rules', 'faqs', 'examples', 'simulator'];
 $trainingSectionUrl = static function (string $key, ?int $brandRouteId = null) use (&$selectedBrandRouteId): string {
     $query = ['section' => $key];
     $targetBrandRouteId = $brandRouteId ?? $selectedBrandRouteId;
@@ -90,7 +92,8 @@ $progress = (int) ($session['progress_percent'] ?? 0);
         <h2>Ensena a AsisFly como trabaja tu empresa</h2>
         <p>Construye el perfil, reglas, preguntas frecuentes y ejemplos que el trabajador virtual usara como contexto autorizado antes de responder.</p>
         <div class="controls-hero-actions">
-            <a class="btn btn-primary" href="<?= e($trainingSectionUrl('onboarding')) ?>"><i class="bi bi-chat-dots"></i> Continuar entrevista</a>
+            <a class="btn btn-primary" href="<?= e($trainingSectionUrl('quick-start')) ?>"><i class="bi bi-lightning-charge"></i> Entrenar con un mensaje</a>
+            <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('onboarding')) ?>"><i class="bi bi-chat-dots"></i> Entrevista guiada</a>
             <a class="btn btn-outline-secondary" href="<?= e($trainingSectionUrl('simulator')) ?>"><i class="bi bi-stars"></i> Practicar respuesta</a>
         </div>
     </div>
@@ -131,6 +134,62 @@ $progress = (int) ($session['progress_percent'] ?? 0);
     </div>
     <small>Completa esta parte para que AsisFly aprenda como vender, responder y operar en <?= e($scopeLabel) ?>.</small>
 </section>
+
+<?php if ($section === 'quick-start'): ?>
+    <?php $quickAnalysis = is_array($quickStartDraft['analysis'] ?? null) ? $quickStartDraft['analysis'] : []; ?>
+    <section class="ai-quick-start-grid mt-4">
+        <form class="panel control-entry-form ai-quick-start-form" method="post" action="<?= url('/ai-training/quick-start') ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
+            <div class="panel-title"><div><span class="eyebrow">Cuéntanos lo esencial</span><h2>Entrena sin documentos ni formularios largos</h2></div><span class="soft-badge"><i class="bi bi-shield-check"></i> Borrador revisable</span></div>
+            <p class="task-muted">Describe cómo trabaja <?= e($scopeLabel) ?>: qué vende, a quién atiende, cómo llegan las consultas, qué debe evitar AsisFly y qué quieres lograr. Puedes escribir como si se lo contaras a una persona.</p>
+            <textarea class="form-control" name="business_brief" rows="11" minlength="30" required placeholder="Ejemplo: Somos un taller de enmarcaciones premium en Curicó. Atendemos solo con hora agendada. Los clientes consultan por WhatsApp por medidas, precios y disponibilidad. Antes de confirmar una hora hay que revisar la agenda del maestro. No prometas valores sin ver la obra. Queremos responder rápido, capturar datos y agendar visitas."><?= e((string) ($quickStartDraft['source_text'] ?? '')) ?></textarea>
+            <div class="ai-quick-start-hints">
+                <span><i class="bi bi-check2"></i> No necesitas documentos</span>
+                <span><i class="bi bi-check2"></i> Después podrás corregir cada dato</span>
+                <span><i class="bi bi-check2"></i> No activa respuestas automáticas</span>
+            </div>
+            <button class="btn btn-primary"><i class="bi bi-stars"></i> Analizar y preparar borrador</button>
+        </form>
+
+        <article class="panel ai-quick-start-preview">
+            <div class="panel-title"><div><span class="eyebrow">Borrador de AsisFly</span><h2><?= $quickStartDraft ? 'Revisa antes de aplicar' : 'Así empezaremos' ?></h2></div><?php if ($quickStartDraft): ?><span class="soft-badge <?= ($quickStartDraft['source'] ?? '') === 'openai' ? 'status-success' : '' ?>"><?= ($quickStartDraft['source'] ?? '') === 'openai' ? 'Preparado con IA' : 'Borrador inicial' ?></span><?php endif; ?></div>
+            <?php if ($quickStartDraft && $quickAnalysis): ?>
+                <div class="ai-quick-start-summary">
+                    <strong><?= e((string) ($quickAnalysis['profile']['company_name'] ?? $scopeLabel)) ?></strong>
+                    <p><?= e((string) ($quickAnalysis['profile']['description'] ?? '')) ?></p>
+                    <?php if (!empty($quickAnalysis['profile']['main_offering'])): ?><small><b>Oferta:</b> <?= e((string) $quickAnalysis['profile']['main_offering']) ?></small><?php endif; ?>
+                    <?php if (!empty($quickAnalysis['profile']['primary_objective'])): ?><small><b>Objetivo:</b> <?= e((string) $quickAnalysis['profile']['primary_objective']) ?></small><?php endif; ?>
+                </div>
+                <div class="ai-quick-start-counts">
+                    <span><b><?= e((string) count($quickAnalysis['products'] ?? [])) ?></b> productos/servicios</span>
+                    <span><b><?= e((string) count($quickAnalysis['rules'] ?? [])) ?></b> reglas</span>
+                    <span><b><?= e((string) count($quickAnalysis['faqs'] ?? [])) ?></b> FAQs</span>
+                </div>
+                <?php if (!empty($quickAnalysis['suggested_questions'])): ?>
+                    <div class="ai-quick-start-questions"><strong>Luego conviene responder:</strong><ul><?php foreach ($quickAnalysis['suggested_questions'] as $question): ?><li><?= e((string) $question) ?></li><?php endforeach; ?></ul></div>
+                <?php endif; ?>
+                <details class="ai-quick-start-details"><summary>Ver todo el borrador</summary>
+                    <?php foreach (['products' => 'Productos y servicios', 'rules' => 'Reglas', 'faqs' => 'Preguntas frecuentes'] as $key => $label): ?>
+                        <?php if (!empty($quickAnalysis[$key])): ?><div><strong><?= e($label) ?></strong><?php foreach ($quickAnalysis[$key] as $item): ?><p><?= e((string) ($item['name'] ?? $item['question'] ?? '')) ?><?= !empty($item['description']) ? ': ' . e((string) $item['description']) : '' ?></p><?php endforeach; ?></div><?php endif; ?>
+                    <?php endforeach; ?>
+                </details>
+                <?php if (($quickStartDraft['status'] ?? '') === 'draft'): ?>
+                    <form method="post" action="<?= url('/ai-training/quick-start/apply') ?>" class="mt-3">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="draft_id" value="<?= e((string) $quickStartDraft['id']) ?>">
+                        <input type="hidden" name="brand_route_id" value="<?= e((string) $selectedBrandRouteId) ?>">
+                        <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Aplicar este borrador</button>
+                    </form>
+                <?php else: ?>
+                    <p class="task-muted mb-0"><i class="bi bi-check2-circle"></i> Este borrador ya fue incorporado al entrenamiento.</p>
+                <?php endif; ?>
+            <?php else: ?>
+                <div class="ai-quick-start-empty"><i class="bi bi-stars"></i><strong>Un mensaje basta para empezar</strong><p>AsisFly organizará un perfil, una personalidad inicial, reglas de seguridad y preguntas que falten. Los documentos, catálogos y ejemplos se pueden sumar después.</p></div>
+            <?php endif; ?>
+        </article>
+    </section>
+<?php endif; ?>
 
 <?php if ($section === 'summary'): ?>
     <section class="workbench-metrics mt-4">

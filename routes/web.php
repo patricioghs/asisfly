@@ -104,6 +104,7 @@ $router->get('/training', [KnowledgeController::class, 'training']);
 $router->get('/ai-training', [AITrainingController::class, 'index']);
 $router->get('/ai-training/summary', [AITrainingController::class, 'summary']);
 $router->get('/ai-training/onboarding', [AITrainingController::class, 'onboarding']);
+$router->get('/ai-training/quick-start', [AITrainingController::class, 'quickStart']);
 $router->get('/ai-training/company', [AITrainingController::class, 'company']);
 $router->get('/ai-training/products', [AITrainingController::class, 'products']);
 $router->get('/ai-training/personality', [AITrainingController::class, 'personality']);
@@ -117,6 +118,8 @@ $router->get('/ai-training/simulator', [AITrainingController::class, 'simulator'
 $router->get('/ai-training/settings', [AITrainingController::class, 'settings']);
 $router->get('/ai-training/versions', [AITrainingController::class, 'versions']);
 $router->post('/ai-training/onboarding', [AITrainingController::class, 'saveOnboarding']);
+$router->post('/ai-training/quick-start', [AITrainingController::class, 'generateQuickStart']);
+$router->post('/ai-training/quick-start/apply', [AITrainingController::class, 'applyQuickStart']);
 $router->post('/ai-training/profile', [AITrainingController::class, 'saveProfile']);
 $router->post('/ai-training/personality', [AITrainingController::class, 'savePersonality']);
 $router->post('/ai-training/product', [AITrainingController::class, 'addProduct']);

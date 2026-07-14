@@ -1327,6 +1327,118 @@ a {
   max-width: 420px;
 }
 
+.ai-quick-start-grid {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+}
+
+.ai-quick-start-form textarea {
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.ai-quick-start-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.ai-quick-start-hints,
+.ai-quick-start-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ai-quick-start-hints span,
+.ai-quick-start-counts span {
+  background: var(--asisty-surface);
+  border: 1px solid var(--asisty-border);
+  border-radius: 999px;
+  color: var(--asisty-muted);
+  font-size: 0.78rem;
+  padding: 7px 10px;
+}
+
+.ai-quick-start-hints i {
+  color: var(--asisty-success);
+}
+
+.ai-quick-start-summary {
+  background: var(--asisty-surface-soft);
+  border: 1px solid var(--asisty-border);
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.ai-quick-start-summary strong {
+  color: var(--asisty-text);
+}
+
+.ai-quick-start-summary p,
+.ai-quick-start-summary small {
+  color: var(--asisty-muted);
+  margin: 0;
+}
+
+.ai-quick-start-questions,
+.ai-quick-start-details {
+  color: var(--asisty-muted);
+  font-size: 0.86rem;
+}
+
+.ai-quick-start-questions strong,
+.ai-quick-start-details strong {
+  color: var(--asisty-text);
+}
+
+.ai-quick-start-questions ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.ai-quick-start-details summary {
+  color: var(--asisty-primary);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.ai-quick-start-details > div {
+  border-top: 1px solid var(--asisty-border);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.ai-quick-start-details p {
+  margin: 6px 0 0;
+}
+
+.ai-quick-start-empty {
+  align-content: center;
+  color: var(--asisty-muted);
+  display: grid;
+  gap: 8px;
+  min-height: 270px;
+  text-align: center;
+}
+
+.ai-quick-start-empty i {
+  color: var(--asisty-primary);
+  font-size: 1.7rem;
+}
+
+.ai-quick-start-empty strong {
+  color: var(--asisty-text);
+}
+
+.ai-quick-start-empty p {
+  margin: 0 auto;
+  max-width: 360px;
+}
+
 .ai-training-next-steps {
   align-items: center;
   display: grid;
@@ -3612,6 +3724,10 @@ a {
 }
 
 @media (max-width: 900px) {
+  .ai-quick-start-grid {
+    grid-template-columns: 1fr;
+  }
+
   .sidebar {
     width: min(320px, 86vw);
   }

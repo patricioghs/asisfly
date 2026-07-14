@@ -9,6 +9,7 @@ use App\Core\Database;
 use App\Repositories\AITrainingRepository;
 use App\Services\AITrainingContextBuilder;
 use App\Services\AITrainingDocumentProcessor;
+use App\Services\AITrainingQuickStartService;
 use Throwable;
 
 final class AITrainingController extends Controller
@@ -26,6 +27,11 @@ final class AITrainingController extends Controller
     public function onboarding(): void
     {
         $this->show('onboarding');
+    }
+
+    public function quickStart(): void
+    {
+        $this->show('quick-start');
     }
 
     public function company(): void
@@ -106,6 +112,7 @@ final class AITrainingController extends Controller
             'questions' => $questions,
             'answersByKey' => $answersByKey,
             'simulation' => $_SESSION['ai_training_simulation'] ?? null,
+            'quickStartDraft' => $repo->quickStartDraft($this->companyId(), 0, (int) ($overview['selectedBrandRouteId'] ?? 0)),
         ]);
         unset($_SESSION['ai_training_simulation']);
     }
@@ -141,6 +148,47 @@ final class AITrainingController extends Controller
             'Respuesta guardada. Puedes continuar cuando quieras.'
         );
         $this->redirect($this->sectionUrl('onboarding', (int) ($_POST['brand_route_id'] ?? 0)) . '#question-' . rawurlencode($questionKey));
+    }
+
+    public function generateQuickStart(): void
+    {
+        $this->requireTrainingAccess('ai_training.edit');
+        $brief = trim((string) ($_POST['business_brief'] ?? ''));
+        $requestedBrandRouteId = (int) ($_POST['brand_route_id'] ?? 0);
+        $repo = new AITrainingRepository();
+        $overview = $repo->overview($this->companyId(), $requestedBrandRouteId);
+        $brandRouteId = (int) ($overview['selectedBrandRouteId'] ?? 0);
+
+        try {
+            $draft = (new AITrainingQuickStartService())->createDraft(
+                $this->companyId(),
+                (int) ($_SESSION['user']['id'] ?? 0),
+                $this->currentCompany(),
+                $brandRouteId,
+                $brief
+            );
+            $_SESSION['flash_success'] = (($draft['source'] ?? '') === 'openai'
+                ? 'AsisFly preparó un borrador con IA. Revísalo antes de aplicarlo.'
+                : 'AsisFly preparó un borrador inicial. Puedes completarlo y aplicarlo cuando esté correcto.');
+        } catch (Throwable $exception) {
+            $_SESSION['flash_error'] = 'No se pudo preparar el borrador: ' . $exception->getMessage();
+        }
+
+        $this->redirect($this->sectionUrl('quick-start', $brandRouteId));
+    }
+
+    public function applyQuickStart(): void
+    {
+        $this->requireTrainingAccess('ai_training.edit');
+        $draftId = (int) ($_POST['draft_id'] ?? 0);
+        $brandRouteId = (int) ($_POST['brand_route_id'] ?? 0);
+        try {
+            $counts = (new AITrainingRepository())->applyQuickStartDraft($this->companyId(), (int) ($_SESSION['user']['id'] ?? 0), $draftId);
+            $_SESSION['flash_success'] = 'Borrador aplicado: perfil, personalidad, ' . $counts['products'] . ' productos, ' . $counts['rules'] . ' reglas y ' . $counts['faqs'] . ' FAQs. AsisFly seguirá en modo supervisado hasta que configures la autonomía por canal.';
+        } catch (Throwable $exception) {
+            $_SESSION['flash_error'] = 'No se pudo aplicar el borrador: ' . $exception->getMessage();
+        }
+        $this->redirect($this->sectionUrl('quick-start', $brandRouteId));
     }
 
     public function saveProfile(): void

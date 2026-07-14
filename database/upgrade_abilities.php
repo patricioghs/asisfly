@@ -34,6 +34,7 @@ try {
         __DIR__ . '/migrations/041_task_source_links.sql',
         __DIR__ . '/migrations/042_hide_workbench_navigation.sql',
         __DIR__ . '/migrations/043_whatsapp_control_center.sql',
+        __DIR__ . '/migrations/044_ai_training_quick_start.sql',
     ] as $file) {
         $sql = file_get_contents($file);
         if ($sql === false) {
