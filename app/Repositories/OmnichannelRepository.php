@@ -253,7 +253,9 @@ final class OmnichannelRepository
             return ['ok' => false, 'message' => 'Primero guarda las credenciales de esta cuenta.'];
         }
 
-        $result = (new ConnectionTester())->test($credentials);
+        $result = in_array((string) ($account['provider'] ?? ''), ['imap', 'gmail', 'outlook'], true)
+            ? $this->testEmailCredentials($credentials)
+            : (new ConnectionTester())->test($credentials);
         Database::connection()->prepare('UPDATE omnichannel_accounts SET status = :status, updated_at = CURRENT_TIMESTAMP WHERE company_id = :company_id AND id = :id')
             ->execute([
                 'status' => $result['ok'] ? 'connected' : 'error',
@@ -299,11 +301,14 @@ final class OmnichannelRepository
                 return ['ok' => false, 'message' => 'No se pudo abrir IMAP: ' . (imap_last_error() ?: 'sin detalle'), 'imported' => 0];
             }
 
-            $uids = imap_search($mailbox, 'UNSEEN', SE_UID) ?: imap_search($mailbox, 'ALL', SE_UID) ?: [];
+            // A mail client can mark a message as read before AsisFly runs. Always scan
+            // the recent mailbox and use Message-ID deduplication instead of the SEEN flag.
+            $uids = imap_search($mailbox, 'ALL', SE_UID) ?: [];
             rsort($uids, SORT_NUMERIC);
             $uids = array_slice($uids, 0, max(1, min($limit, 50)));
             $imported = 0;
-            $skipped = 0;
+            $duplicates = 0;
+            $failed = 0;
             $lastError = null;
 
             foreach ($uids as $uid) {
@@ -312,14 +317,15 @@ final class OmnichannelRepository
                     $overviewList = imap_fetch_overview($mailbox, (string) $uid, FT_UID);
                     $overview = is_array($overviewList) ? ($overviewList[0] ?? null) : null;
                     if (!$overview) {
-                        $skipped++;
+                        $failed++;
+                        $lastError = 'No se pudo leer el encabezado IMAP UID ' . $uid . '.';
                         continue;
                     }
 
                     $messageId = trim((string) ($overview->message_id ?? '')) ?: 'imap-' . $account['id'] . '-' . $uid;
                     $messageId = substr($messageId, 0, 170);
                     if ($this->messageExists($companyId, $messageId)) {
-                        $skipped++;
+                        $duplicates++;
                         continue;
                     }
 
@@ -342,18 +348,18 @@ final class OmnichannelRepository
 
                     $imported += !empty($result['ok']) ? 1 : 0;
                     if (empty($result['ok'])) {
-                        $skipped++;
+                        $failed++;
                         $lastError = (string) ($result['message'] ?? 'No se pudo importar un correo.');
                     }
                 } catch (\Throwable $exception) {
-                    $skipped++;
+                    $failed++;
                     $lastError = $exception->getMessage();
                 }
             }
 
             return [
                 'ok' => true,
-                'message' => "Sincronizacion completada. Correos nuevos: {$imported}. Omitidos: {$skipped}." . ($lastError ? ' Ultimo aviso: ' . $lastError : ''),
+                'message' => "Sincronizacion completada. Revisados: " . count($uids) . ". Correos nuevos: {$imported}. Ya importados: {$duplicates}. Con error: {$failed}." . ($lastError ? ' Ultimo aviso: ' . $lastError : ''),
                 'imported' => $imported,
             ];
         } catch (\Throwable $exception) {
@@ -855,6 +861,32 @@ final class OmnichannelRepository
         $statement = Database::connection()->prepare('SELECT id FROM inbox_messages WHERE company_id = :company_id AND external_message_id = :external_message_id LIMIT 1');
         $statement->execute(['company_id' => $companyId, 'external_message_id' => $externalMessageId]);
         return (bool) $statement->fetchColumn();
+    }
+
+    private function testEmailCredentials(array $credentials): array
+    {
+        $connectivity = (new ConnectionTester())->test($credentials);
+        if (empty($connectivity['ok'])) {
+            return $connectivity;
+        }
+        if (!function_exists('imap_open')) {
+            return ['ok' => false, 'message' => 'IMAP está alcanzable, pero la extensión IMAP de PHP no está habilitada en este servidor.'];
+        }
+
+        $mailboxPath = $this->mailboxPath($credentials);
+        $username = (string) ($credentials['username'] ?? $credentials['email_address'] ?? '');
+        $password = (string) ($credentials['password'] ?? '');
+        if ($mailboxPath === '' || $username === '' || $password === '') {
+            return ['ok' => false, 'message' => 'Credenciales IMAP incompletas.'];
+        }
+
+        $mailbox = @imap_open($mailboxPath, $username, $password, OP_READONLY, 1);
+        if (!$mailbox) {
+            return ['ok' => false, 'message' => 'IMAP no aceptó el usuario o clave: ' . (imap_last_error() ?: 'sin detalle')];
+        }
+
+        imap_close($mailbox);
+        return ['ok' => true, 'message' => 'IMAP autenticado correctamente. ' . (string) ($connectivity['message'] ?? '')];
     }
 
     private function mailboxPath(array $credentials): string
