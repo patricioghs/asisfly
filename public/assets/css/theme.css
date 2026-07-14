@@ -4140,6 +4140,29 @@ a {
 .compact-connectors[open] > summary { border-bottom: 1px solid var(--asisty-border); }
 .compact-connectors .omni-account-grid { padding: 14px; }
 
+/* On desktop, conversations and the active case keep their own reading position. */
+@media (min-width: 781px) {
+  .inbox-premium-layout {
+    height: calc(100dvh - 122px);
+    max-height: calc(100dvh - 122px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .inbox-premium-layout .supervision-list,
+  .inbox-premium-layout .supervision-detail {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .inbox-premium-layout .supervision-list::-webkit-scrollbar,
+  .inbox-premium-layout .supervision-detail::-webkit-scrollbar { width: 8px; }
+  .inbox-premium-layout .supervision-list::-webkit-scrollbar-thumb,
+  .inbox-premium-layout .supervision-detail::-webkit-scrollbar-thumb { background: #cbd5e1; border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
+}
+
 /* Tareas: la lista es el centro de la pantalla; los detalles quedan a un clic. */
 .task-compact-head { align-items: center; display: flex; gap: 20px; justify-content: space-between; padding: 4px 2px; }
 .task-compact-head h2 { color: var(--asisty-text); font-family: var(--font-display, inherit); font-size: 1.4rem; font-weight: 900; margin: 2px 0 4px; }
