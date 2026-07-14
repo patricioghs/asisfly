@@ -16,7 +16,8 @@ final class SmtpMailer
         $encryption = $this->encryptionForPort((int) ($credentials['smtp_port'] ?? 587), (string) ($credentials['smtp_encryption'] ?? 'tls'));
         $username = trim((string) ($credentials['username'] ?? $credentials['email_address'] ?? ''));
         $password = (string) ($credentials['password'] ?? '');
-        $from = trim((string) ($credentials['email_address'] ?? $username));
+        $from = $this->emailAddress((string) ($credentials['email_address'] ?? ''))
+            ?: $this->emailAddress($username);
 
         if ($host === '' || $port <= 0 || $username === '' || $password === '' || $from === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('Credenciales SMTP incompletas o destinatario invalido.');
@@ -103,6 +104,20 @@ final class SmtpMailer
             25 => 'none',
             default => in_array(strtolower($configured), ['ssl', 'tls', 'none'], true) ? strtolower($configured) : 'tls',
         };
+    }
+
+    private function emailAddress(string $value): string
+    {
+        $value = trim(str_replace(["\r", "\n"], '', $value));
+        if (filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            return $value;
+        }
+
+        if (preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $value, $match)) {
+            return (string) $match[0];
+        }
+
+        return '';
     }
 
     private function message(string $from, string $to, string $subject, string $body): string

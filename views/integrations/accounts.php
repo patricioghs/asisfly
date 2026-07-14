@@ -231,7 +231,6 @@ $whatsAppWebhookUrl = $webhookHost !== '' ? $scheme . '://' . $webhookHost . url
                         <form class="account-card-form" method="post" action="<?= url('/integrations/accounts/credentials') ?>">
                             <?= csrf_field() ?>
                             <input type="hidden" name="account_id" value="<?= e((string) $account['id']) ?>">
-                            <input type="hidden" name="email_address" value="<?= e($account['external_account_id'] ?? '') ?>">
                             <div class="account-form-row">
                                 <label>
                                     <span>IMAP host</span>
@@ -260,6 +259,10 @@ $whatsAppWebhookUrl = $webhookHost !== '' ? $scheme . '://' . $webhookHost . url
                                 </label>
                             </div>
                             <div class="account-form-row">
+                                <label>
+                                    <span>Correo remitente</span>
+                                    <input class="form-control" type="email" name="email_address" value="<?= e((string) ($credential['email_address'] ?? $account['external_account_id'] ?? '')) ?>" placeholder="correo@empresa.com" required>
+                                </label>
                                 <label>
                                     <span>Usuario</span>
                                     <input class="form-control" name="username" value="<?= e((string) ($credential['username'] ?? '')) ?>" placeholder="correo@empresa.com">
