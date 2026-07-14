@@ -763,17 +763,24 @@ final class OmnichannelRepository
         }
 
         $password = (string) ($input['password'] ?? '');
+        $imapPort = (int) ($input['imap_port'] ?? 993);
+        $smtpPort = (int) ($input['smtp_port'] ?? 587);
         return [
             'type' => 'email_imap_smtp',
             'email_address' => trim((string) ($input['email_address'] ?? $account['external_account_id'] ?? '')),
             'username' => trim((string) ($input['username'] ?? '')),
             'password' => $password !== '' ? $password : (string) ($existing['password'] ?? ''),
             'imap_host' => trim((string) ($input['imap_host'] ?? '')),
-            'imap_port' => (int) ($input['imap_port'] ?? 993),
-            'imap_encryption' => $this->encryption((string) ($input['imap_encryption'] ?? 'ssl')),
+            'imap_port' => $imapPort,
+            'imap_encryption' => $imapPort === 993 ? 'ssl' : ($imapPort === 143 ? 'tls' : $this->encryption((string) ($input['imap_encryption'] ?? 'tls'))),
             'smtp_host' => trim((string) ($input['smtp_host'] ?? '')),
-            'smtp_port' => (int) ($input['smtp_port'] ?? 587),
-            'smtp_encryption' => $this->encryption((string) ($input['smtp_encryption'] ?? 'tls')),
+            'smtp_port' => $smtpPort,
+            'smtp_encryption' => match ($smtpPort) {
+                465 => 'ssl',
+                587 => 'tls',
+                25 => 'none',
+                default => $this->encryption((string) ($input['smtp_encryption'] ?? 'tls')),
+            },
         ];
     }
 

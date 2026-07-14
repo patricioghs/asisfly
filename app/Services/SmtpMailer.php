@@ -13,7 +13,7 @@ final class SmtpMailer
     {
         $host = trim((string) ($credentials['smtp_host'] ?? ''));
         $port = (int) ($credentials['smtp_port'] ?? 587);
-        $encryption = strtolower((string) ($credentials['smtp_encryption'] ?? 'tls'));
+        $encryption = $this->encryptionForPort((int) ($credentials['smtp_port'] ?? 587), (string) ($credentials['smtp_encryption'] ?? 'tls'));
         $username = trim((string) ($credentials['username'] ?? $credentials['email_address'] ?? ''));
         $password = (string) ($credentials['password'] ?? '');
         $from = trim((string) ($credentials['email_address'] ?? $username));
@@ -79,12 +79,30 @@ final class SmtpMailer
             }
         }
 
+        if ($response === '') {
+            $meta = stream_get_meta_data($socket);
+            $reason = !empty($meta['timed_out'])
+                ? 'el servidor SMTP no respondio a tiempo'
+                : (!empty($meta['eof']) ? 'el servidor SMTP cerro la conexion' : 'no hubo respuesta del servidor SMTP');
+            throw new RuntimeException($reason . '. Verifica que el puerto y cifrado coincidan (587 TLS, 465 SSL o 25 sin cifrado).');
+        }
+
         $code = (int) substr($response, 0, 3);
         if (!in_array($code, $expected, true)) {
             throw new RuntimeException('SMTP respondio inesperadamente: ' . trim($response));
         }
 
         return $response;
+    }
+
+    private function encryptionForPort(int $port, string $configured): string
+    {
+        return match ($port) {
+            465 => 'ssl',
+            587 => 'tls',
+            25 => 'none',
+            default => in_array(strtolower($configured), ['ssl', 'tls', 'none'], true) ? strtolower($configured) : 'tls',
+        };
     }
 
     private function message(string $from, string $to, string $subject, string $body): string
