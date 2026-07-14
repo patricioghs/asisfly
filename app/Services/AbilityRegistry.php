@@ -92,7 +92,6 @@ final class AbilityRegistry
                 ['/excel', 'Excel', 'bi-file-earmark-spreadsheet', null],
                 ['/indicators', 'Indicadores', 'bi-bullseye', null],
                 ['/kpis', 'KPIs', 'bi-speedometer2', null],
-                ['/brains', 'Cerebros IA', 'bi-diagram-3', null],
             ],
             'Conocimiento' => [
                 ['/ai-training', 'Centro de Entrenamiento IA', 'bi-mortarboard', null],

@@ -36,6 +36,7 @@ try {
         __DIR__ . '/migrations/043_whatsapp_control_center.sql',
         __DIR__ . '/migrations/044_ai_training_quick_start.sql',
         __DIR__ . '/migrations/045_hide_duplicate_memory_navigation.sql',
+        __DIR__ . '/migrations/046_hide_ai_brains_navigation.sql',
     ] as $file) {
         $sql = file_get_contents($file);
         if ($sql === false) {
