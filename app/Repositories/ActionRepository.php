@@ -102,6 +102,8 @@ final class ActionRepository
 
     public function create(int $companyId, ?int $userId, array $data): void
     {
+        $requestedBy = $this->validUserId($companyId, $userId);
+        $assignedTo = $this->validUserId($companyId, isset($data['assigned_to']) ? (int) $data['assigned_to'] : $requestedBy);
         $item = [
             'id' => random_int(1000, 999999),
             'title' => $data['title'] ?? 'Accion sugerida',
@@ -115,7 +117,7 @@ final class ActionRepository
             'requires_approval' => $data['requires_approval'] ?? true,
             'required_permission' => $data['required_permission'] ?? $this->defaultPermission($data['action_type'] ?? 'review'),
             'required_role' => $data['required_role'] ?? null,
-            'assigned_to' => $data['assigned_to'] ?? $userId,
+            'assigned_to' => $assignedTo,
             'max_retries' => (int) ($data['max_retries'] ?? 2),
             'due_at' => $data['due_at'] ?? date('Y-m-d H:i:s', strtotime('+1 day')),
             'payload' => $data['payload'] ?? [],
@@ -130,7 +132,7 @@ final class ActionRepository
         $statement = Database::connection()->prepare('INSERT INTO action_center_items (company_id, requested_by, assigned_to, title, description, module, brain, action_type, status, priority, risk_level, requires_approval, required_permission, required_role, max_retries, due_at, payload_json) VALUES (:company_id, :requested_by, :assigned_to, :title, :description, :module, :brain, :action_type, :status, :priority, :risk_level, :requires_approval, :required_permission, :required_role, :max_retries, :due_at, :payload_json)');
         $statement->execute([
             'company_id' => $companyId,
-            'requested_by' => $userId,
+            'requested_by' => $requestedBy,
             'assigned_to' => $item['assigned_to'] ?: null,
             'title' => $item['title'],
             'description' => $item['description'],
@@ -148,8 +150,8 @@ final class ActionRepository
             'payload_json' => json_encode($item['payload'], JSON_UNESCAPED_UNICODE),
         ]);
         $actionId = (int) Database::connection()->lastInsertId();
-        $this->logEvent($companyId, $actionId, $userId ?: 0, 'created', 'Accion creada y enviada a aprobacion.', ['risk_level' => $item['risk_level'], 'priority' => $item['priority']]);
-        $this->notify($companyId, $actionId, $item['assigned_to'] ?: $userId, 'Nueva accion pendiente', $item['title']);
+        $this->logEvent($companyId, $actionId, $requestedBy, 'created', 'Accion creada y enviada a aprobacion.', ['risk_level' => $item['risk_level'], 'priority' => $item['priority']]);
+        $this->notify($companyId, $actionId, $item['assigned_to'] ?: $requestedBy, 'Nueva accion pendiente', $item['title']);
     }
 
     public function transition(int $companyId, int $id, string $status, int $userId, array $user = []): void
@@ -416,13 +418,13 @@ final class ActionRepository
         ]);
     }
 
-    private function logEvent(int $companyId, int $actionId, int $userId, string $eventType, string $notes, array $metadata): void
+    private function logEvent(int $companyId, int $actionId, ?int $userId, string $eventType, string $notes, array $metadata): void
     {
         $statement = Database::connection()->prepare('INSERT INTO action_center_events (company_id, action_id, user_id, event_type, notes, metadata_json) VALUES (:company_id, :action_id, :user_id, :event_type, :notes, :metadata_json)');
         $statement->execute([
             'company_id' => $companyId,
             'action_id' => $actionId,
-            'user_id' => $userId,
+            'user_id' => $this->validUserId($companyId, $userId),
             'event_type' => $eventType,
             'notes' => $notes,
             'metadata_json' => json_encode($metadata, JSON_UNESCAPED_UNICODE),
@@ -484,6 +486,21 @@ final class ActionRepository
             return true;
         } catch (\Throwable) {
             return false;
+        }
+    }
+
+    private function validUserId(int $companyId, ?int $userId): ?int
+    {
+        if (!$userId || $userId <= 0) {
+            return null;
+        }
+
+        try {
+            $statement = Database::connection()->prepare('SELECT id FROM users WHERE id = :id AND company_id = :company_id LIMIT 1');
+            $statement->execute(['id' => $userId, 'company_id' => $companyId]);
+            return $statement->fetchColumn() ? $userId : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 
